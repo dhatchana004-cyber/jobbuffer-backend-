@@ -1,0 +1,98 @@
+[
+  {
+    "id": "click_1793341550598_x3xw",
+    "jobId": "jobvetta_jv_1793341134033_9",
+    "candidateUserId": "6036f2cd-b92a-4bf9-a39b-0595baee59fa",
+    "timestamp": "2026-10-30T06:25:50.598Z"
+  },
+  {
+    "id": "click_1793341257784_lf2q",
+    "jobId": "jobvetta_jv_1793341134033_0",
+    "candidateUserId": "6036f2cd-b92a-4bf9-a39b-0595baee59fa",
+    "timestamp": "2026-10-30T06:20:57.784Z"
+  },
+  {
+    "id": "click_1793277372895_2jjw",
+    "jobId": "jobvetta_jv_1793276206594_4",
+    "candidateUserId": "6a03d745-f56f-4716-9306-9841cdf89a98",
+    "timestamp": "2026-10-29T12:36:12.895Z"
+  },
+  {
+    "id": "click_1793277328532_0taq",
+    "jobId": "jobvetta_jv_1793276206594_5",
+    "candidateUserId": "6a03d745-f56f-4716-9306-9841cdf89a98",
+    "timestamp": "2026-10-29T12:35:28.532Z"
+  },
+  {
+    "id": "click_1793277321901_qokk",
+    "jobId": "jobvetta_jv_1793276206594_4",
+    "candidateUserId": "6a03d745-f56f-4716-9306-9841cdf89a98",
+    "timestamp": "2026-10-29T12:35:21.901Z"
+  },
+  {
+    "id": "click_1793277310843_onko",
+    "jobId": "jobvetta_jv_1793276206594_2",
+    "candidateUserId": "6a03d745-f56f-4716-9306-9841cdf89a98",
+    "timestamp": "2026-10-29T12:35:10.843Z"
+  },
+  {
+    "id": "click_1793277244175_gffp",
+    "jobId": "jobvetta_jv_1793276206595_11",
+    "candidateUserId": "6a03d745-f56f-4716-9306-9841cdf89a98",
+    "timestamp": "2026-10-29T12:34:04.175Z"
+  },
+  {
+    "id": "click_1793277225635_2u1q",
+    "jobId": "jobvetta_jv_1793276206596_12",
+    "candidateUserId": "6a03d745-f56f-4716-9306-9841cdf89a98",
+    "timestamp": "2026-10-29T12:33:45.635Z"
+  },
+  {
+    "id": "click_1793277160301_8umj",
+    "jobId": "jobvetta_jv_1793276206596_13",
+    "candidateUserId": "6a03d745-f56f-4716-9306-9841cdf89a98",
+    "timestamp": "2026-10-29T12:32:40.301Z"
+  },
+  {
+    "id": "click_1793249255103_krt2",
+    "jobId": "jobvetta_jv_1793249242734_3",
+    "candidateUserId": "candidate_web_user",
+    "timestamp": "2026-10-29T04:47:35.103Z"
+  },
+  {
+    "id": "click_1793249150796_mvfq",
+    "jobId": "jobvetta_jv_1793249128199_8",
+    "candidateUserId": "candidate_web_user",
+    "timestamp": "2026-10-29T04:45:50.796Z"
+  },
+  {
+    "id": "click_1793249141573_ovtj",
+    "jobId": "jobvetta_jv_1793249128199_9",
+    "candidateUserId": "candidate_web_user",
+    "timestamp": "2026-10-29T04:45:41.573Z"
+  },
+  {
+    "id": "click_1793248454808_e74s",
+    "jobId": "jobvetta_jv_1793247252953_0",
+    "candidateUserId": "anonymous",
+    "timestamp": "2026-10-29T04:34:14.808Z"
+  },
+  {
+    "id": "click_1793248454801_ljkg",
+    "jobId": "jobvetta_jv_1793247252953_0",
+    "candidateUserId": "cand_1",
+    "timestamp": "2026-10-29T04:34:14.801Z"
+  },
+  {
+    "id": "click_1793247096119_fzhw",
+    "jobId": "jobvetta_jv_1793247042281_0",
+    "candidateUserId": "anonymous",
+    "timestamp": "2026-10-29T04:11:36.119Z"
+  },
+  {
+    "id": "click_1793247087929_erpf",
+    "jobId": "jobvetta_jv_1793247042281_0",
+    "candidateUserId": "candidate-123",
+    "timestamp": "2026-10-29T04:11:27.929Z"
+  }
+]

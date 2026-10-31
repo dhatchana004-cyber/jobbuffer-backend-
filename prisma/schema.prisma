@@ -1,0 +1,332 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CANDIDATE
+  RECRUITER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+}
+
+model User {
+  id              String    @id @default(uuid())
+  name            String
+  email           String    @unique
+  phone           String?   @unique
+  passwordHash    String
+  role            Role
+  status          UserStatus @default(ACTIVE)
+  profileImage    String?
+  emailVerified   Boolean   @default(false)
+  phoneVerified   Boolean   @default(false)
+  lastLoginAt     DateTime?
+  
+  candidateProfile CandidateProfile?
+  recruiterProfile RecruiterProfile?
+  
+  auditLogs       AdminAuditLog[]
+  messages        Message[]
+  conversations   Conversation[] @relation("ConversationParticipants")
+  notifications   Notification[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model CandidateProfile {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  location        String?
+  expectedSalary  String?
+  noticePeriod    String?
+  workMode        String?
+  
+  resumes         Resume[]
+  applications    Application[]
+  savedJobs       SavedJob[]
+  skills          Skill[]
+  interviews      Interview[]
+}
+
+model RecruiterProfile {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  companyId       String?
+  company         Company?  @relation(fields: [companyId], references: [id])
+  
+  designation     String?
+  
+  jobs            Job[]
+  interviews      Interview[]
+}
+
+model Company {
+  id              String    @id @default(uuid())
+  name            String
+  logo            String?
+  website         String?
+  industry        String?
+  size            String?
+  description     String?
+  headquarters    String?
+  
+  recruiters      RecruiterProfile[]
+  jobs            Job[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+enum JobStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  PAUSED
+  CLOSED
+  EXPIRED
+  REJECTED
+}
+
+model Job {
+  id                  String    @id @default(uuid())
+  title               String
+  description         String
+  responsibilities    String
+  requirements        String
+  
+  salaryMin           Float?
+  salaryMax           Float?
+  salaryCurrency      String?
+  experienceMin       Int?
+  experienceMax       Int?
+  
+  jobType             String?
+  workMode            String?
+  location            String?
+  openings            Int       @default(1)
+  applicationDeadline DateTime?
+  benefits            String?
+  isUrgent            Boolean   @default(false)
+  
+  status              JobStatus @default(DRAFT)
+  
+  categoryId          String?
+  category            JobCategory? @relation(fields: [categoryId], references: [id])
+  
+  companyId           String
+  company             Company   @relation(fields: [companyId], references: [id])
+  
+  recruiterId         String
+  recruiter           RecruiterProfile @relation(fields: [recruiterId], references: [id])
+  
+  applications        Application[]
+  savedBy             SavedJob[]
+  skills              JobSkill[]
+  interviews          Interview[]
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model JobCategory {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  jobs            Job[]
+}
+
+model Skill {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  
+  candidates      CandidateProfile[]
+  jobSkills       JobSkill[]
+}
+
+model JobSkill {
+  jobId           String
+  skillId         String
+  
+  job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skill           Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  
+  @@id([jobId, skillId])
+}
+
+model Resume {
+  id              String    @id @default(uuid())
+  candidateId     String
+  candidate       CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  fileUrl         String
+  fileName        String
+  isPrimary       Boolean   @default(false)
+  
+  applications    Application[]
+  
+  createdAt       DateTime  @default(now())
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SCREENING
+  SHORTLISTED
+  INTERVIEW
+  SELECTED
+  HIRED
+  REJECTED
+  WITHDRAWN
+}
+
+model Application {
+  id              String    @id @default(uuid())
+  
+  jobId           String
+  job             Job       @relation(fields: [jobId], references: [id])
+  
+  candidateId     String
+  candidate       CandidateProfile @relation(fields: [candidateId], references: [id])
+  
+  resumeId        String?
+  resume          Resume?   @relation(fields: [resumeId], references: [id])
+  
+  status          ApplicationStatus @default(APPLIED)
+  
+  history         ApplicationStatusHistory[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([jobId, candidateId])
+}
+
+model ApplicationStatusHistory {
+  id              String    @id @default(uuid())
+  applicationId   String
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  oldStatus       ApplicationStatus
+  newStatus       ApplicationStatus
+  
+  changedById     String
+  
+  reason          String?
+  
+  createdAt       DateTime  @default(now())
+}
+
+model SavedJob {
+  candidateId     String
+  jobId           String
+  
+  candidate       CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  
+  @@id([candidateId, jobId])
+}
+
+model Conversation {
+  id              String    @id @default(uuid())
+  participants    User[]    @relation("ConversationParticipants")
+  messages        Message[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Message {
+  id              String    @id @default(uuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  senderId        String
+  sender          User      @relation(fields: [senderId], references: [id])
+  
+  content         String
+  read            Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+}
+
+model AdminAuditLog {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  
+  action          String
+  entity          String
+  entityId        String?
+  
+  metadata        String?
+  
+  createdAt       DateTime  @default(now())
+}
+
+enum InterviewType {
+  VIDEO
+  PHONE
+  IN_PERSON
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+model Interview {
+  id              String          @id @default(uuid())
+  title           String
+  type            InterviewType   @default(VIDEO)
+  status          InterviewStatus @default(SCHEDULED)
+  
+  scheduledAt     DateTime
+  durationMinutes Int             @default(45)
+  meetingLink     String?
+  location        String?
+  notes           String?
+  feedback        String?
+  
+  recruiterId     String
+  recruiter       RecruiterProfile @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+  
+  candidateId     String
+  candidate       CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  jobId           String?
+  job             Job?             @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  message     String
+  type        String   @default("INFO")
+  read        Boolean  @default(false)
+  link        String?
+  createdAt   DateTime @default(now())
+}
+

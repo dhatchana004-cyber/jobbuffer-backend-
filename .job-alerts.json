@@ -1,0 +1,12 @@
+[
+  {
+    "id": "alert_1793356692256",
+    "userId": "user123",
+    "title": "React Developer",
+    "location": "Chennai",
+    "jobType": "Full-time",
+    "frequency": "Instant",
+    "enabled": true,
+    "createdAt": "2026-10-30T10:38:12.256Z"
+  }
+]
