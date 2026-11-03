@@ -489,9 +489,13 @@ class JobvettaService {
    * Transform raw Jobvetta API or seed record into unified Jobbuffer Job schema
    */
   private formatToUnifiedJob(raw: any, index: number): UnifiedJob {
-    const jobId = raw.job_id || raw.id || `jv_${Date.now()}_${index}`;
+    const rawCompany = typeof raw.company === 'string' ? raw.company : (raw.company?.name || raw.companyName || 'Top_Employer');
+    const compSlug = rawCompany.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20);
+    const titleSlug = (raw.title || 'software_engineer').toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 25);
+    const stableSuffix = `jv_seed_${index}_${compSlug}_${titleSlug}`;
+    const jobId = raw.job_id || raw.id || stableSuffix;
     const title = raw.title || 'Software Engineer';
-    const company = typeof raw.company === 'string' ? raw.company : (raw.company?.name || raw.companyName || 'Top Indian Employer');
+    const company = rawCompany;
     const location = raw.location || raw.locationName || 'Bengaluru, Karnataka, India';
     const verifiedUrl = getVerifiedCareerUrl(company, raw.url || raw.externalUrl);
     const daysAgo = Number(raw.days_ago !== undefined ? raw.days_ago : (raw.daysAgo !== undefined ? raw.daysAgo : 1));
@@ -503,7 +507,7 @@ class JobvettaService {
       daysAgo <= 2 ? 'FRESH' : (daysAgo <= 10 ? 'RECENT' : 'ARCHIVED');
 
     return {
-      id: `jobvetta_${jobId}`,
+      id: jobId.startsWith('jobvetta_') ? jobId : `jobvetta_${jobId}`,
       title,
       description,
       responsibilities,
@@ -645,7 +649,7 @@ class JobvettaService {
             headers: {
               'Authorization': `Bearer ${apiKey.trim()}`,
               'Accept': 'application/json',
-              'User-Agent': 'Jobbuffer-Recruitment-Portal/2.0'
+              'User-Agent': 'JoBuffer-Recruitment-Portal/2.0'
             },
             signal: controller.signal
           });
@@ -711,11 +715,12 @@ class JobvettaService {
    * Fetch a single Jobvetta job by its ID
    */
   public async getJobById(jobId: string): Promise<UnifiedJob | null> {
+    if (!jobId) return null;
     const cleanId = jobId.startsWith('jobvetta_') ? jobId : `jobvetta_${jobId}`;
     
-    // Search in current cache entries first
+    // 1. Search in current cache entries first
     for (const entry of this.cache.values()) {
-      const found = entry.data.find(j => j.id === cleanId);
+      const found = entry.data.find(j => j.id === cleanId || j.id === jobId || (j as any)._id === jobId);
       if (found) {
         found.externalUrl = getVerifiedCareerUrl(found.company?.name, found.externalUrl);
         found.applyUrl = found.externalUrl;
@@ -723,14 +728,37 @@ class JobvettaService {
       }
     }
 
-    // Search in seed jobs
+    // 2. Search in deterministic seed jobs
     const allSeeds = INDIAN_TECH_JOBS_SEED.map((s, idx) => this.formatToUnifiedJob(s, idx));
-    const seedFound = allSeeds.find(j => j.id === cleanId);
+    const seedFound = allSeeds.find(j => 
+      j.id === cleanId || 
+      j.id === jobId || 
+      j.id.toLowerCase() === cleanId.toLowerCase()
+    );
     if (seedFound) {
       seedFound.externalUrl = getVerifiedCareerUrl(seedFound.company?.name, seedFound.externalUrl);
       seedFound.applyUrl = seedFound.externalUrl;
       return seedFound;
     }
+
+    // 3. Backward-compatible timestamp index matching (e.g. jv_1793604647662_2 or jv_seed_2)
+    const matchIndex = jobId.match(/_(\d+)$/);
+    if (matchIndex && matchIndex[1]) {
+      const idx = parseInt(matchIndex[1], 10);
+      if (idx >= 0 && idx < allSeeds.length) {
+        const indexedJob = allSeeds[idx];
+        return indexedJob;
+      }
+    }
+
+    // 4. Fuzzy / Title & Company fallback match across all seeds
+    const cleanKeyword = jobId.replace(/^(jobvetta_|jv_|click_)/i, '').replace(/[_-]/g, ' ').toLowerCase();
+    const fuzzyMatch = allSeeds.find(j => {
+      const comp = (j.company?.name || '').toLowerCase();
+      const tit = (j.title || '').toLowerCase();
+      return (comp && cleanKeyword.includes(comp)) || (tit && cleanKeyword.includes(tit));
+    });
+    if (fuzzyMatch) return fuzzyMatch;
 
     return null;
   }

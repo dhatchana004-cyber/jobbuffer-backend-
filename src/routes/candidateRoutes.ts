@@ -25,6 +25,7 @@ const saveAlerts = (alerts: any[]) => {
 };
 
 import multer from 'multer';
+import { getCandidateExtendedDetails } from '../utils/candidateProfileStore';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -98,6 +99,8 @@ router.get('/profile', async (req: Request, res: Response) => {
     if (skillNames.length > 0) strength += 15;
     if (hasResume) strength += 20;
 
+    const extDetails = getCandidateExtendedDetails(user, skillNames, candidateProfile.noticePeriod);
+
     const profileData = {
       id: user.id,
       name: user.name,
@@ -109,8 +112,15 @@ router.get('/profile', async (req: Request, res: Response) => {
       noticePeriod: candidateProfile.noticePeriod || '',
       expectedSalary: candidateProfile.expectedSalary || '',
       skills: skillNames,
-      experience: candidateProfile.noticePeriod ? `Notice: ${candidateProfile.noticePeriod}` : '',
-      headline: skillNames.length > 0 ? `${skillNames[0]} Engineer` : '',
+      experience: extDetails.experienceList?.[0] ? `${extDetails.experienceList[0].role} (${extDetails.experienceList[0].duration})` : ((candidateProfile as any).experience || ''),
+      bio: extDetails.bio || '',
+      education: extDetails.education || [],
+      experienceList: extDetails.experienceList || [],
+      certifications: extDetails.certifications || [],
+      projects: extDetails.projects || [],
+      languages: extDetails.languages || ['English', 'Tamil'],
+      links: extDetails.links || {},
+      headline: extDetails.headline || (skillNames.length > 0 ? `${skillNames[0]} Engineer` : ''),
       resume: primaryResume?.fileUrl || null,
       resumeName: cleanResumeName,
       profileCompletion: strength
@@ -237,13 +247,24 @@ router.put('/profile', upload.any(), async (req: Request, res: Response) => {
     // Check if resume file was uploaded in request
     const uploadedFile = (req.files as any[])?.[0];
     let createdResume = null;
-    if (uploadedFile) {
-      const cleanOriginalName = decodeURIComponent(uploadedFile.originalname || 'Resume.pdf');
+    if (uploadedFile && uploadedFile.buffer) {
+      const cleanOriginalName = decodeURIComponent(uploadedFile.originalname || 'Resume.pdf').replace(/%20/g, ' ');
+      const uploadsDir = path.join(__dirname, '../../uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      const safeDiskName = `${user.id}_${Date.now()}_${cleanOriginalName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      try {
+        fs.writeFileSync(path.join(uploadsDir, safeDiskName), uploadedFile.buffer);
+      } catch (e) {
+        console.warn('Error writing uploaded resume to disk:', e);
+      }
+
       createdResume = await prisma.resume.create({
         data: {
           candidateId: candidateProfile.id,
           fileName: cleanOriginalName,
-          fileUrl: `https://storage.jobbuffer.in/resumes/${user.id}_${Date.now()}.pdf`,
+          fileUrl: `/api/resumes/${safeDiskName}`,
           isPrimary: true
         }
       });
@@ -346,15 +367,33 @@ router.post('/resume', async (req: Request, res: Response) => {
     }
 
     // Create Resume entry
+    const uploadedFile = (req.files as any[])?.[0] || (req as any).file;
     const cleanFileName = fileName 
       ? decodeURIComponent(fileName).replace(/%20/g, ' ') 
-      : 'Resume.pdf';
+      : (uploadedFile?.originalname ? decodeURIComponent(uploadedFile.originalname).replace(/%20/g, ' ') : 'Resume.pdf');
+
+    let savedFileUrl = fileUrl || '';
+    if (uploadedFile && uploadedFile.buffer) {
+      const uploadsDir = path.join(__dirname, '../../uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      const safeDiskName = `${user.id}_${Date.now()}_${cleanFileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      try {
+        fs.writeFileSync(path.join(uploadsDir, safeDiskName), uploadedFile.buffer);
+      } catch (e) {
+        console.warn('Error saving file buffer:', e);
+      }
+      savedFileUrl = `/api/resumes/${safeDiskName}`;
+    } else if (!savedFileUrl || savedFileUrl.includes('storage.jobbuffer.in')) {
+      savedFileUrl = `/api/resumes/${encodeURIComponent(cleanFileName)}`;
+    }
 
     const resume = await prisma.resume.create({
       data: {
         candidateId: candidateProfile.id,
         fileName: cleanFileName,
-        fileUrl: fileUrl || `https://storage.jobbuffer.in/resumes/${user.id}_resume.pdf`,
+        fileUrl: savedFileUrl,
         isPrimary: true
       }
     });

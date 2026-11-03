@@ -2,12 +2,15 @@ import { Router } from 'express';
 import { prisma } from '../server';
 import { sendApplicationReceivedEmail } from '../services/emailService';
 import { jobvettaService, getVerifiedCareerUrl } from '../services/jobvettaService';
+import jwt from 'jsonwebtoken';
+import path from 'path';
+import fs from 'fs';
 
 const router = Router();
 
 /**
  * 1. GET /api/jobs & /api/v1/jobs
- * Unified endpoint for candidates: supports searching both Jobbuffer native jobs
+ * Unified endpoint for candidates: supports searching both JoBuffer native jobs
  * and live external Jobvetta openings across India with 30-minute caching.
  */
 router.get('/', async (req, res) => {
@@ -31,8 +34,8 @@ router.get('/', async (req, res) => {
     let internalJobs: any[] = [];
     let externalJobs: any[] = [];
 
-    // A. Fetch internal Jobbuffer database jobs unless client explicitly wants only Jobvetta
-    if (source === 'ALL' || source === 'INTERNAL' || source === 'JOBBUFFER' || source === 'ORASSYS') {
+    // A. Fetch internal JoBuffer database jobs unless client explicitly wants only Jobvetta
+    if (source === 'ALL' || source === 'INTERNAL' || source === 'JOBUFFER' || source === 'JOBBUFFER' || source === 'ORASSYS') {
       const whereClause: any = { status: 'PUBLISHED' };
 
       if (isUrgentFilter) {
@@ -95,7 +98,14 @@ router.get('/', async (req, res) => {
     }
 
     // C. Combine & sort: Internal postings first, followed by fresh Jobvetta verified jobs
-    const combined = [...internalJobs, ...externalJobs];
+    // Deduplicate by job ID to guarantee unique keys across all clients
+    const seenJobIds = new Set<string>();
+    const combined = [...internalJobs, ...externalJobs].filter(job => {
+      const jId = String(job.id || (job as any)._id || '');
+      if (!jId || seenJobIds.has(jId)) return false;
+      seenJobIds.add(jId);
+      return true;
+    });
 
     // Response includes caching metadata headers
     res.setHeader('X-Cache-Engine', 'Jobvetta-Cache-v1');
@@ -198,36 +208,135 @@ router.get('/jobvetta/redirect/:id', handleExternalRedirect);
 router.get('/external/:id/apply', handleExternalRedirect);
 
 /**
- * 6. GET /api/jobs/:id
+ * 6. GET /api/jobs/:id/application-status
+ * Live check from the database to see if this candidate applied for this job
+ */
+router.get('/:id/application-status', async (req, res) => {
+  try {
+    const rawId = req.params.id;
+    const jobId = String(rawId || '').trim();
+    const { userId, email } = req.query;
+
+    let user: any = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded: any = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET || 'secret');
+        if (decoded?.userId || decoded?.id) {
+          user = await prisma.user.findUnique({ where: { id: decoded.userId || decoded.id } });
+        }
+      } catch {}
+    }
+
+    if (!user && userId) {
+      user = await prisma.user.findUnique({ where: { id: String(userId) } });
+    }
+    if (!user && email) {
+      user = await prisma.user.findUnique({ where: { email: String(email).toLowerCase().trim() } });
+    }
+
+    if (!user) {
+      return res.status(200).json({ applied: false, status: null });
+    }
+
+    const cp = await prisma.candidateProfile.findUnique({ where: { userId: user.id } });
+    if (!cp) {
+      return res.status(200).json({ applied: false, status: null });
+    }
+
+    // Check application by exact jobId or stripped prefix
+    const application = await prisma.application.findFirst({
+      where: {
+        candidateId: cp.id,
+        OR: [
+          { jobId },
+          { jobId: jobId.replace(/^jobvetta_/, '') },
+          { jobId: `jobvetta_${jobId}` }
+        ]
+      }
+    });
+
+    if (application) {
+      return res.status(200).json({
+        applied: true,
+        status: application.status,
+        applicationId: application.id,
+        appliedAt: application.createdAt
+      });
+    }
+
+    return res.status(200).json({ applied: false, status: null });
+  } catch (err) {
+    return res.status(200).json({ applied: false, status: null });
+  }
+});
+
+/**
+ * 7. GET /api/jobs/:id
  * Supports both internal database jobs and Jobvetta jobs
  */
 router.get('/:id', async (req, res) => {
   try {
-    const jobId = req.params.id;
+    const rawId = req.params.id;
+    const jobId = String(rawId || '').trim();
 
-    // Check if this is a Jobvetta job
+    // 1. Check if this is a Jobvetta job
     if (jobId.startsWith('jobvetta_') || jobId.startsWith('jv_')) {
       const jvJob = await jobvettaService.getJobById(jobId);
-      if (!jvJob) {
-        return res.status(404).json({ message: 'External job not found or expired' });
+      if (jvJob) {
+        return res.status(200).json({
+          ...jvJob,
+          companyName: jvJob.company?.name || jvJob.company,
+          company: jvJob.company?.name || jvJob.company,
+          companyObj: jvJob.company
+        });
       }
-      return res.status(200).json({
-        ...jvJob,
-        companyName: jvJob.company.name,
-        company: jvJob.company.name,
-        companyObj: jvJob.company
-      });
     }
 
-    const job = await prisma.job.findUnique({
+    // 2. Query internal PostgreSQL database
+    let job = await prisma.job.findUnique({
       where: { id: jobId },
       include: {
         company: true,
         category: true,
         skills: { include: { skill: true } }
       }
-    });
-    if (!job) return res.status(404).json({ message: 'Job not found' });
+    }).catch(() => null);
+
+    // 3. Fallback: try finding by removing prefixes or findFirst
+    if (!job) {
+      job = await prisma.job.findFirst({
+        where: {
+          OR: [
+            { id: jobId },
+            { id: jobId.replace(/^job_/, '') }
+          ]
+        },
+        include: {
+          company: true,
+          category: true,
+          skills: { include: { skill: true } }
+        }
+      }).catch(() => null);
+    }
+
+    // 4. Fallback: check Jobvetta service even if id didn't start with jobvetta_ prefix
+    if (!job) {
+      const jvJob = await jobvettaService.getJobById(jobId);
+      if (jvJob) {
+        return res.status(200).json({
+          ...jvJob,
+          companyName: jvJob.company?.name || jvJob.company,
+          company: jvJob.company?.name || jvJob.company,
+          companyObj: jvJob.company
+        });
+      }
+    }
+
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
     return res.status(200).json({
       ...job,
       isExternal: false,
@@ -241,25 +350,8 @@ router.get('/:id', async (req, res) => {
 
 router.post('/:id/apply', async (req, res) => {
   try {
-    const jobId = req.params.id;
-
-    // A. Intercept Jobvetta external jobs
-    if (jobId.startsWith('jobvetta_') || jobId.startsWith('jv_')) {
-      const jvJob = await jobvettaService.getJobById(jobId);
-      jobvettaService.logApplyRedirect(jobId, req.body.userId);
-
-      const targetUrl = jvJob?.externalUrl || getVerifiedCareerUrl(jvJob?.company?.name || 'Company');
-
-      return res.status(200).json({
-        success: true,
-        isExternal: true,
-        source: 'Jobvetta',
-        externalUrl: targetUrl,
-        redirectUrl: targetUrl,
-        message: 'Redirecting to official company career portal',
-        job: jvJob
-      });
-    }
+    const rawId = req.params.id;
+    const jobId = String(rawId || '').trim();
 
     const { 
       userId, 
@@ -287,32 +379,56 @@ router.post('/:id/apply', async (req, res) => {
       resumeName 
     } = req.body;
 
-    let user = null;
-    if (userId) {
+    // Resolve candidate user from JWT or body parameters
+    let user: any = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded: any = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET || 'secret');
+        if (decoded?.userId || decoded?.id) {
+          user = await prisma.user.findUnique({ where: { id: decoded.userId || decoded.id } });
+        }
+      } catch {}
+    }
+
+    if (!user && userId) {
       user = await prisma.user.findUnique({ where: { id: String(userId) } });
     }
     if (!user && email) {
       user = await prisma.user.findUnique({ where: { email: String(email).toLowerCase().trim() } });
     }
-    if (!user) {
-      user = await prisma.user.findFirst({
-        where: { role: 'CANDIDATE' },
-        orderBy: { createdAt: 'desc' }
-      });
+
+    // Check phone uniqueness before creating/updating to avoid constraint errors
+    let safePhone: string | null = null;
+    if (phone && phone !== 'N/A' && phone !== '9876543210') {
+      try {
+        const existingPhoneUser = await prisma.user.findUnique({ where: { phone: String(phone) } });
+        if (!existingPhoneUser || existingPhoneUser.id === user?.id) {
+          safePhone = String(phone);
+        }
+      } catch {}
     }
 
-    if (!user) {
-      // Auto-create candidate user if none exists
-      const emailToUse = (email && String(email).trim()) || `candidate_${Date.now()}@jobbuffer.com`;
+    // If an email was provided but no user exists yet with that email, create the candidate user for that email!
+    if (!user && email) {
+      const emailToUse = String(email).toLowerCase().trim();
       const nameToUse = fullName || name || 'Candidate User';
       user = await prisma.user.create({
         data: {
           email: emailToUse,
           name: nameToUse,
-          phone: phone ? String(phone) : null,
+          phone: safePhone,
           passwordHash: '$2a$10$eO7oG2N4oR3zI5LwK1gQMeKzWfIuC6g9hY9yL9vX9w7a8b9c0d1e2',
           role: 'CANDIDATE'
         }
+      });
+    }
+
+    // Only if absolutely NO identifier was provided, fallback to default candidate
+    if (!user && !userId && !email) {
+      user = await prisma.user.findFirst({
+        where: { role: 'CANDIDATE' },
+        orderBy: { createdAt: 'desc' }
       });
     }
 
@@ -322,10 +438,10 @@ router.post('/:id/apply', async (req, res) => {
     if (candidateName && candidateName !== 'Candidate User') {
       userUpdates.name = candidateName;
     }
-    if (phone && phone !== 'N/A' && phone !== '9876543210') {
-      userUpdates.phone = phone;
+    if (safePhone && user?.phone !== safePhone) {
+      userUpdates.phone = safePhone;
     }
-    if (Object.keys(userUpdates).length > 0) {
+    if (Object.keys(userUpdates).length > 0 && user?.id) {
       try {
         user = await prisma.user.update({
           where: { id: user.id },
@@ -346,6 +462,111 @@ router.post('/:id/apply', async (req, res) => {
       candidateProfile = await prisma.candidateProfile.create({
         data: { userId: user.id },
         include: { skills: true, resumes: true }
+      });
+    }
+
+    // Check for duplicate application BEFORE processing to prevent double applications
+    const existingApplication = await prisma.application.findFirst({
+      where: {
+        jobId,
+        candidateId: candidateProfile.id
+      }
+    });
+
+    if (existingApplication) {
+      return res.status(200).json({
+        success: true,
+        alreadyApplied: true,
+        message: 'You have already applied for this opening. The recruiter has your application.',
+        application: existingApplication
+      });
+    }
+
+    // Handle Jobvetta external job applications with permanent DB persistence
+    if (jobId.startsWith('jobvetta_') || jobId.startsWith('jv_')) {
+      const jvJob = await jobvettaService.getJobById(jobId);
+      jobvettaService.logApplyRedirect(jobId, user.id);
+
+      // Ensure company and recruiter exist so foreign keys in Job table are satisfied
+      const companyName = jvJob?.company?.name || 'Partner Employer';
+      let company = await prisma.company.findFirst({ where: { name: companyName } });
+      if (!company) {
+        company = await prisma.company.create({
+          data: {
+            name: companyName,
+            headquarters: jvJob?.location || 'India',
+            website: jvJob?.externalUrl || 'https://www.google.com'
+          }
+        });
+      }
+
+      let recruiter = await prisma.recruiterProfile.findFirst();
+      if (!recruiter) {
+        let recUser = await prisma.user.findFirst({ where: { role: 'RECRUITER' } });
+        if (!recUser) {
+          recUser = await prisma.user.create({
+            data: {
+              name: 'Hiring Partner',
+              email: 'partner.recruiter@jobuffer.com',
+              role: 'RECRUITER',
+              passwordHash: '$2a$10$eO7oG2N4oR3zI5LwK1gQMeKzWfIuC6g9hY9yL9vX9w7a8b9c0d1e2'
+            }
+          });
+        }
+        recruiter = await prisma.recruiterProfile.create({
+          data: {
+            userId: recUser.id,
+            companyId: company.id
+          }
+        });
+      }
+
+      // Upsert Job in database so Application relation is 100% valid
+      await prisma.job.upsert({
+        where: { id: jobId },
+        update: {},
+        create: {
+          id: jobId,
+          title: jvJob?.title || 'Engineering Role',
+          description: jvJob?.description || 'Job opening',
+          responsibilities: jvJob?.responsibilities || 'Responsibilities',
+          requirements: jvJob?.requirements || 'Requirements',
+          location: jvJob?.location || 'India',
+          workMode: jvJob?.workMode || 'Hybrid',
+          jobType: jvJob?.jobType || 'Full-time',
+          companyId: company.id,
+          recruiterId: recruiter.id,
+          status: 'PUBLISHED'
+        }
+      });
+
+      // Upsert Application in database
+      const app = await prisma.application.upsert({
+        where: {
+          jobId_candidateId: {
+            jobId,
+            candidateId: candidateProfile.id
+          }
+        },
+        update: { status: 'APPLIED' },
+        create: {
+          jobId,
+          candidateId: candidateProfile.id,
+          status: 'APPLIED'
+        }
+      });
+
+      const targetUrl = jvJob?.externalUrl || getVerifiedCareerUrl(companyName);
+
+      return res.status(200).json({
+        success: true,
+        isExternal: true,
+        source: 'Jobvetta',
+        externalUrl: targetUrl,
+        redirectUrl: targetUrl,
+        message: 'Application recorded and redirecting to official company career portal',
+        application: app,
+        job: jvJob
       });
     }
 
@@ -417,7 +638,7 @@ router.post('/:id/apply', async (req, res) => {
     let primaryResumeId = candidateProfile.resumes?.[0]?.id || null;
     if (!primaryResumeId && (resumeUrl || resumeName)) {
       const rName = resumeName ? decodeURIComponent(resumeName).replace(/%20/g, ' ') : 'Candidate_Resume.pdf';
-      const rUrl = resumeUrl || `https://storage.jobbuffer.in/resumes/${user.id}_resume.pdf`;
+      const rUrl = resumeUrl || `https://storage.jobuffer.in/resumes/${user.id}_resume.pdf`;
       try {
         const newResume = await prisma.resume.create({
           data: {

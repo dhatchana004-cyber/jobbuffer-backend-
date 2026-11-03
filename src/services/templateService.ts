@@ -89,7 +89,7 @@ Thank you for your interest in joining {company_name}! We have received your app
 
 Our recruiting team is currently reviewing your application and qualifications against the role requirements. We will reach out to you once there is an update on your candidacy.
 
-You can also monitor your application progress anytime directly in your Jobbuffer portal.
+You can also monitor your application progress anytime directly in your JoBuffer portal.
 
 Thank you again for considering {company_name} for the next step in your career!
 
@@ -119,7 +119,7 @@ Great news! The hiring team at {company_name} has thoroughly reviewed your crede
 Next Steps:
 Our hiring coordinator will be reaching out shortly to coordinate interview rounds and evaluate your schedule.
 
-You can also check your applicant pipeline and upcoming milestones in your Jobbuffer dashboard:
+You can also check your applicant pipeline and upcoming milestones in your JoBuffer dashboard:
 {action_url}
 
 Congratulations on making it to the shortlisted stage!
@@ -177,7 +177,7 @@ On behalf of {company_name}, we are delighted to offer you the position of {job_
 
 We were thoroughly impressed by your background, interviews, and experience throughout our recruitment process. We believe your leadership and technical skills will make an outstanding impact on our team.
 
-Please review your formal offer letter and compensation package by signing into your Jobbuffer portal:
+Please review your formal offer letter and compensation package by signing into your JoBuffer portal:
 {action_url}
 
 If you have any questions, feel free to reply directly to this email.
@@ -204,7 +204,7 @@ Warmest regards,
     subject: 'Opportunity: We think you would be a great fit for {job_title} at {company_name}',
     body: `Hi {candidate_name},
 
-I came across your profile on Jobbuffer and was really impressed by your experience and accomplishments.
+I came across your profile on JoBuffer and was really impressed by your experience and accomplishments.
 
 We are currently expanding our team at {company_name} and are looking for a talented {job_title}. Given your skillset, I believe this position would be an exciting next step in your career.
 
@@ -229,10 +229,10 @@ Talent Acquisition Team
       '{candidate_name}',
       '{otp_code}'
     ],
-    subject: 'Your Jobbuffer Verification Code: {otp_code}',
+    subject: 'Your JoBuffer Verification Code: {otp_code}',
     body: `Hello {candidate_name},
 
-Thank you for creating an account with Jobbuffer.
+Thank you for creating an account with JoBuffer.
 
 Your single-use email verification code is:
 {otp_code}
@@ -242,7 +242,7 @@ This verification code will expire in 15 minutes. For security reasons, please d
 If you did not request this verification, please safely disregard this email.
 
 Best regards,
-The Jobbuffer Team`,
+The JoBuffer Team`,
     updatedAt: new Date().toISOString()
   },
   ANNOUNCEMENT: {
@@ -257,20 +257,20 @@ The Jobbuffer Team`,
       '{company_name}',
       '{action_url}'
     ],
-    subject: '📢 Important Update from Jobbuffer Platform Administration',
+    subject: '📢 Important Update from JoBuffer Platform Administration',
     body: `Hello {candidate_name},
 
-We have an important announcement regarding upcoming platform enhancements and scheduled maintenance on Jobbuffer.
+We have an important announcement regarding upcoming platform enhancements and scheduled maintenance on JoBuffer.
 
 Please review the latest updates to make sure your recruiting and application workflows remain completely seamless.
 
 Access your dashboard here:
 {action_url}
 
-Thank you for being a valued member of the Jobbuffer community!
+Thank you for being a valued member of the JoBuffer community!
 
 Best regards,
-Jobbuffer Global Administration`,
+JoBuffer Global Administration`,
     updatedAt: new Date().toISOString()
   }
 };

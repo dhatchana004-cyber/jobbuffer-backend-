@@ -1,5 +1,65 @@
 [
   {
+    "id": "log_1793704772928_i3i7t",
+    "recipientEmail": "davidmanisa143@gmail.com",
+    "recipientName": "Manimuthuraja",
+    "subject": "🎉 Congratulations! You have been Shortlisted for Senior Full Stack Developer at Chennaiinfo",
+    "bodySnippet": "Shortlisted for: Senior Full Stack Developer",
+    "templateCode": "SHORTLISTED",
+    "companyId": "7f5c4d4c-6970-4fc1-a7a3-3ace80edd3e5",
+    "status": "DELIVERED",
+    "channel": "EMAIL",
+    "sentAt": "2026-11-03T11:19:32.929Z"
+  },
+  {
+    "id": "log_1793704429172_qno8s",
+    "recipientEmail": "davidmanisa143@gmail.com",
+    "recipientName": "Manimuthuraja",
+    "subject": "Application Received: Senior Full Stack Developer at Chennaiinfo",
+    "bodySnippet": "Job: Senior Full Stack Developer at Chennaiinfo",
+    "templateCode": "APPLICATION_RECEIVED",
+    "companyId": "7f5c4d4c-6970-4fc1-a7a3-3ace80edd3e5",
+    "status": "DELIVERED",
+    "channel": "EMAIL",
+    "sentAt": "2026-11-03T11:13:49.172Z"
+  },
+  {
+    "id": "log_1793697622242_ggrdz",
+    "recipientEmail": "davidmanisa143@gmail.com",
+    "recipientName": "Manimuthuraja",
+    "subject": "🎉 Formal Job Offer: Senior Full Stack Developer at Chennaiinfo",
+    "bodySnippet": "Job offer for: Senior Full Stack Developer",
+    "templateCode": "JOB_OFFER",
+    "companyId": "7f5c4d4c-6970-4fc1-a7a3-3ace80edd3e5",
+    "status": "DELIVERED",
+    "channel": "EMAIL",
+    "sentAt": "2026-11-03T09:20:22.243Z"
+  },
+  {
+    "id": "log_1793692620304_us55x",
+    "recipientEmail": "davidmanisa143@gmail.com",
+    "recipientName": "Manimuthuraja",
+    "subject": "🎉 Congratulations! You have been Shortlisted for Cybersecurity Analyst & Threat Hunter at Chennaiinfo",
+    "bodySnippet": "Shortlisted for: Cybersecurity Analyst & Threat Hunter",
+    "templateCode": "SHORTLISTED",
+    "companyId": "7f5c4d4c-6970-4fc1-a7a3-3ace80edd3e5",
+    "status": "DELIVERED",
+    "channel": "EMAIL",
+    "sentAt": "2026-11-03T07:57:00.304Z"
+  },
+  {
+    "id": "log_1793691507273_5mnbk",
+    "recipientEmail": "davidmanisa143@gmail.com",
+    "recipientName": "Manimuthuraja",
+    "subject": "Application Received: Python Developer at Tamil Tech",
+    "bodySnippet": "Job: Python Developer at Tamil Tech",
+    "templateCode": "APPLICATION_RECEIVED",
+    "companyId": "ef9b5866-6699-43a2-875e-7afb4737a613",
+    "status": "DELIVERED",
+    "channel": "EMAIL",
+    "sentAt": "2026-11-03T07:38:27.273Z"
+  },
+  {
     "id": "log_1793442456413_rvd9b",
     "recipientEmail": "davidmanisa143@gmail.com",
     "recipientName": "Manimuthuraja",

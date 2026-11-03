@@ -9,7 +9,9 @@ import {
   sendInterviewReminderEmail
 } from '../services/emailService';
 import { calculateAtsScore } from '../utils/atsCalculator';
+import { resolveCandidateName } from '../utils/candidateNameHelper';
 import { permanentlyDeleteUser } from '../services/userDeletionService';
+import { getCandidateExtendedDetails } from '../utils/candidateProfileStore';
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
@@ -27,6 +29,7 @@ export const getUsers = async (req: Request, res: Response) => {
     });
     const formatted = users.map(u => ({
       ...u,
+      name: u.role === 'CANDIDATE' ? resolveCandidateName(u) : u.name,
       joined: new Date(u.createdAt).toLocaleDateString(),
       lastActive: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : 'Never'
     }));
@@ -63,30 +66,60 @@ export const getCandidates = async (req: Request, res: Response) => {
           select: { id: true, name: true, email: true, phone: true, status: true, createdAt: true }
         },
         skills: true,
-        resumes: { select: { id: true, fileUrl: true } },
+        resumes: { select: { id: true, fileUrl: true, fileName: true }, orderBy: { createdAt: 'desc' } },
         _count: {
           select: { applications: true }
         }
       },
       orderBy: { user: { createdAt: 'desc' } }
     });
-    const formatted = candidates.map(c => ({
-      id: c.id,
-      userId: c.userId,
-      name: c.user.name,
-      email: c.user.email,
-      phone: c.user.phone || 'N/A',
-      headline: c.skills.length > 0 ? `${c.skills[0].name} Specialist` : (c.workMode ? `${c.workMode} Professional` : 'Candidate'),
-      location: c.location || 'Not Specified',
-      workMode: c.workMode || 'Not Specified',
-      noticePeriod: c.noticePeriod || 'Not Specified',
-      expectedSalary: c.expectedSalary || 'Negotiable',
-      experience: c.noticePeriod ? `Notice: ${c.noticePeriod}` : 'Not Specified',
-      skills: c.skills.map(s => s.name),
-      status: c.user.status,
-      resumeUrl: c.resumes[0]?.fileUrl || null,
-      applications: c._count.applications
-    }));
+    const formatted = candidates.map(c => {
+      const candSkills = c.skills.map(s => s.name);
+      const extDetails = getCandidateExtendedDetails(c.user, candSkills, c.noticePeriod || undefined);
+      const rawResume = c.resumes[0];
+      let resumeUrl: string | null = null;
+      let resumeFileName: string | null = null;
+      let hasResume = false;
+
+      if (rawResume?.fileUrl || rawResume?.fileName) {
+        hasResume = true;
+        resumeFileName = rawResume.fileName ? decodeURIComponent(rawResume.fileName).replace(/%20/g, ' ') : 'Resume.pdf';
+        const fileUrlStr = String(rawResume.fileUrl || '');
+        if (fileUrlStr.startsWith('/api/resumes/') || (fileUrlStr.startsWith('http') && !fileUrlStr.includes('storage.jobbuffer.in'))) {
+          resumeUrl = fileUrlStr;
+        } else {
+          const fn = fileUrlStr.split('/').pop() || resumeFileName;
+          resumeUrl = `/api/resumes/${encodeURIComponent(fn)}`;
+        }
+      }
+
+      return {
+        id: c.id,
+        userId: c.userId,
+        name: resolveCandidateName(c.user, c.resumes),
+        email: c.user.email,
+        phone: c.user.phone || 'N/A',
+        headline: extDetails.headline || (candSkills.length > 0 ? `${candSkills[0]} Specialist` : (c.workMode ? `${c.workMode} Professional` : 'Candidate')),
+        location: c.location || 'Not Specified',
+        workMode: c.workMode || 'Not Specified',
+        noticePeriod: c.noticePeriod || 'Not Specified',
+        expectedSalary: c.expectedSalary || 'Negotiable',
+        experience: extDetails.experienceList?.[0] ? `${extDetails.experienceList[0].role} (${extDetails.experienceList[0].duration})` : (c.noticePeriod ? `Notice: ${c.noticePeriod}` : 'Not Specified'),
+        bio: extDetails.bio || '',
+        education: extDetails.education || [],
+        experienceList: extDetails.experienceList || [],
+        certifications: extDetails.certifications || [],
+        projects: extDetails.projects || [],
+        languages: extDetails.languages || ['English', 'Tamil'],
+        links: extDetails.links || {},
+        skills: candSkills,
+        status: c.user.status,
+        hasResume,
+        resumeUrl,
+        resumeFileName,
+        applications: c._count.applications
+      };
+    });
     return res.status(200).json(formatted);
   } catch (error) {
     return res.status(500).json({ message: 'Error fetching candidates' });
@@ -290,17 +323,39 @@ export const getAdminApplications = async (req: Request, res: Response) => {
         (app.job as any).description
       );
 
+      const extDetails = getCandidateExtendedDetails(app.candidate.user, candSkills);
       const rawResume = app.candidate.resumes[0];
-      const hasResume = Boolean(rawResume?.fileUrl && !rawResume.fileUrl.includes('storage.jobbuffer.in') && !rawResume.fileUrl.includes('storage.orassys.in'));
+      let resumeUrl: string | null = null;
+      let resumeFileName: string | null = null;
+      let hasResume = false;
+
+      if (rawResume?.fileUrl || rawResume?.fileName) {
+        hasResume = true;
+        resumeFileName = rawResume.fileName ? decodeURIComponent(rawResume.fileName).replace(/%20/g, ' ') : 'Resume.pdf';
+        const fileUrlStr = String(rawResume.fileUrl || '');
+        if (fileUrlStr.startsWith('/api/resumes/') || (fileUrlStr.startsWith('http') && !fileUrlStr.includes('storage.jobbuffer.in'))) {
+          resumeUrl = fileUrlStr;
+        } else {
+          const fn = fileUrlStr.split('/').pop() || resumeFileName;
+          resumeUrl = `/api/resumes/${encodeURIComponent(fn)}`;
+        }
+      }
 
       return {
         id: app.id,
         candidateId: app.candidate.id,
-        candidateName: app.candidate.user.name,
+        candidateName: resolveCandidateName(app.candidate.user, app.candidate.resumes),
         candidateEmail: app.candidate.user.email,
         candidatePhone: app.candidate.user.phone || 'N/A',
         location: app.candidate.location || app.job.location || 'Not Specified',
         skills: candSkills,
+        education: extDetails.education || [],
+        experienceList: extDetails.experienceList || [],
+        bio: extDetails.bio || '',
+        certifications: extDetails.certifications || [],
+        projects: extDetails.projects || [],
+        languages: extDetails.languages || ['English', 'Tamil'],
+        links: extDetails.links || {},
         jobId: app.job.id,
         jobTitle: app.job.title,
         jobCategory: (app.job as any).category?.name || 'Development',
@@ -308,8 +363,8 @@ export const getAdminApplications = async (req: Request, res: Response) => {
         companyId: app.job.company.id,
         companyName: app.job.company.name,
         status: app.status,
-        resumeUrl: hasResume ? rawResume.fileUrl : null,
-        resumeFileName: hasResume ? (rawResume.fileName ? decodeURIComponent(rawResume.fileName).replace(/%20/g, ' ') : null) : null,
+        resumeUrl,
+        resumeFileName,
         hasResume,
         atsScore,
         appliedAt: app.createdAt,
@@ -608,7 +663,7 @@ export const getInterviews = async (req: Request, res: Response) => {
       location: i.location,
       notes: i.notes,
       feedback: i.feedback,
-      candidateName: i.candidate.user.name,
+      candidateName: resolveCandidateName(i.candidate.user),
       candidateEmail: i.candidate.user.email,
       candidatePhone: i.candidate.user.phone || 'N/A',
       candidateLocation: i.candidate.location || 'Remote',
@@ -847,13 +902,13 @@ export const testSendEmailTemplate = async (req: Request, res: Response) => {
       candidate_name: 'Alex Mercer',
       job_title: 'Senior Full Stack Engineer',
       company_name: 'Tech Innovations Ltd',
-      interview_url: 'https://meet.google.com/jobbuffer-demo',
+      interview_url: 'https://meet.google.com/jobuffer-demo',
       interview_date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }),
       interview_time: '10:30 AM IST',
       user_first_name: 'Sarah',
       user_last_name: 'Jenkins',
       otp_code: '8492',
-      action_url: 'http://localhost:5173/login'
+      action_url: `${process.env.FRONTEND_URL || 'https://jobuffer.com'}/login`
     };
 
     let subject = customSubject;
@@ -956,8 +1011,8 @@ export const dispatchEmailAnnouncement = async (req: Request, res: Response) => 
         if (u.email) {
           const personalizedBody = body
             .split('{candidate_name}').join(u.name)
-            .split('{company_name}').join('Jobbuffer')
-            .split('{action_url}').join('http://localhost:5173/login');
+            .split('{company_name}').join('JoBuffer')
+            .split('{action_url}').join(`${process.env.FRONTEND_URL || 'https://jobuffer.com'}/login`);
 
           sendAnnouncementEmail(u.email, u.name, subject, personalizedBody, customReplyTo).catch(() => {});
           emailDispatchedCount++;

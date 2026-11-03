@@ -9,7 +9,7 @@
     },
     "data": [
       {
-        "id": "jobvetta_jv_1793443283046_0",
+        "id": "jobvetta_jv_seed_0_zoho_corporation_senior_python___fastapi_e",
         "title": "Senior Python & FastAPI Engineer",
         "description": "Build enterprise-grade cloud services, high-throughput microservices, and asynchronous event streams in Python, PostgreSQL, and Redis.",
         "responsibilities": "Design and deploy robust RESTful APIs, optimize query latency, participate in architecture reviews, and maintain zero-downtime microservices.",
@@ -46,11 +46,11 @@
         "daysAgo": 1,
         "freshness": "FRESH",
         "postedAt": "1d ago",
-        "createdAt": "2026-10-30T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-11-02T12:04:46.596Z",
+        "updatedAt": "2026-11-03T12:04:46.596Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_1",
+        "id": "jobvetta_jv_seed_1_swiggy_full_stack_react___node_j",
         "title": "Full Stack React & Node.js Developer",
         "description": "Work on consumer-facing delivery and checkout experiences handling millions of real-time transactions daily.",
         "responsibilities": "Build responsive, accessible candidate and merchant interfaces, reduce bundle sizes, and integrate real-time tracking web sockets.",
@@ -87,11 +87,11 @@
         "daysAgo": 2,
         "freshness": "FRESH",
         "postedAt": "2d ago",
-        "createdAt": "2026-10-29T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-11-01T12:04:46.596Z",
+        "updatedAt": "2026-11-03T12:04:46.596Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_2",
+        "id": "jobvetta_jv_seed_2_razorpay_data_engineer___snowflake",
         "title": "Data Engineer / Snowflake Specialist",
         "description": "Design and manage modern data lake pipelines processing millions of payment ledgers and financial reconciliation events.",
         "responsibilities": "Construct automated ETL DAGs, enforce data quality contracts, and deliver real-time analytics to product stakeholders.",
@@ -128,11 +128,11 @@
         "daysAgo": 3,
         "freshness": "RECENT",
         "postedAt": "3d ago",
-        "createdAt": "2026-10-28T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-10-31T12:04:46.597Z",
+        "updatedAt": "2026-11-03T12:04:46.597Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_3",
+        "id": "jobvetta_jv_seed_3_reliance_jio_power_bi___enterprise_ana",
         "title": "Power BI & Enterprise Analytics Specialist",
         "description": "Architect executive Power BI dashboards, DAX measures, data modeling, and automated KPI pipelines across telecom and digital commerce operations.",
         "responsibilities": "Design performant BI reports, optimize DAX calculations, collaborate with business stakeholders, and govern workspace permissions.",
@@ -169,11 +169,11 @@
         "daysAgo": 1,
         "freshness": "FRESH",
         "postedAt": "1d ago",
-        "createdAt": "2026-10-30T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-11-02T12:04:46.597Z",
+        "updatedAt": "2026-11-03T12:04:46.597Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_4",
+        "id": "jobvetta_jv_seed_4_freshworks_devops___cloud_infrastruc",
         "title": "DevOps & Cloud Infrastructure Engineer",
         "description": "Empower hundreds of software engineers by building resilient Kubernetes clusters, CI/CD automated gates, and AWS multi-region infrastructure.",
         "responsibilities": "Maintain 99.99% SaaS availability, automate infrastructure as code, and drive cloud cost optimization.",
@@ -210,11 +210,11 @@
         "daysAgo": 2,
         "freshness": "FRESH",
         "postedAt": "2d ago",
-        "createdAt": "2026-10-29T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-11-01T12:04:46.597Z",
+        "updatedAt": "2026-11-03T12:04:46.597Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_5",
+        "id": "jobvetta_jv_seed_5_tata_consultancy_ser_java_backend_architect__s",
         "title": "Java Backend Architect (Spring Boot)",
         "description": "Lead banking transformation architecture, modernizing legacy enterprise systems into cloud-native microservices.",
         "responsibilities": "Lead engineering pods, establish design guidelines, and write performant multithreaded core services.",
@@ -251,11 +251,11 @@
         "daysAgo": 4,
         "freshness": "RECENT",
         "postedAt": "4d ago",
-        "createdAt": "2026-10-27T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-10-30T12:04:46.597Z",
+        "updatedAt": "2026-11-03T12:04:46.597Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_6",
+        "id": "jobvetta_jv_seed_6_flipkart_machine_learning___ai_eng",
         "title": "Machine Learning & AI Engineer",
         "description": "Build predictive search ranking, customer recommendation algorithms, and automated visual search models.",
         "responsibilities": "Develop state-of-the-art recommendation systems, perform A/B test iterations, and deploy low-latency inference pipelines.",
@@ -292,11 +292,11 @@
         "daysAgo": 1,
         "freshness": "FRESH",
         "postedAt": "1d ago",
-        "createdAt": "2026-10-30T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-11-02T12:04:46.597Z",
+        "updatedAt": "2026-11-03T12:04:46.597Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_7",
+        "id": "jobvetta_jv_seed_7_cred_ios___mobile_application_",
         "title": "iOS & Mobile Application Developer",
         "description": "Craft award-winning, fluid user interfaces and micro-animations for high-affluent mobile consumers.",
         "responsibilities": "Create pixel-perfect native experiences, optimize app launch time, and engineer rock-solid payment flows.",
@@ -333,11 +333,11 @@
         "daysAgo": 3,
         "freshness": "RECENT",
         "postedAt": "3d ago",
-        "createdAt": "2026-10-28T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-10-31T12:04:46.597Z",
+        "updatedAt": "2026-11-03T12:04:46.597Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_8",
+        "id": "jobvetta_jv_seed_8_zomato_frontend_engineer__vue___",
         "title": "Frontend Engineer (Vue / React)",
         "description": "Build ultra-fast, high-converting interfaces for food discovery, quick-commerce, and live dining experiences.",
         "responsibilities": "Partner with design teams to ship micro-interactions, monitor crash metrics, and deliver frictionless user journeys.",
@@ -374,11 +374,11 @@
         "daysAgo": 2,
         "freshness": "FRESH",
         "postedAt": "2d ago",
-        "createdAt": "2026-10-29T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-11-01T12:04:46.597Z",
+        "updatedAt": "2026-11-03T12:04:46.597Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_9",
+        "id": "jobvetta_jv_seed_9_infosys_limited_cybersecurity_analyst___t",
         "title": "Cybersecurity Analyst & Threat Hunter",
         "description": "Guard global enterprise perimeters, analyze zero-day attack vectors, and manage automated incident response playbooks.",
         "responsibilities": "Perform 24/7 SOC operations, coordinate red-team simulations, and patch mission-critical vulnerabilities.",
@@ -415,11 +415,11 @@
         "daysAgo": 5,
         "freshness": "RECENT",
         "postedAt": "5d ago",
-        "createdAt": "2026-10-26T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-10-29T12:04:46.597Z",
+        "updatedAt": "2026-11-03T12:04:46.597Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_10",
+        "id": "jobvetta_jv_seed_10_phonepe_qa_automation_engineer__p",
         "title": "QA Automation Engineer (Playwright / Cypress)",
         "description": "Build automated end-to-end regression suites ensuring infallible reliability across millions of UPI transactions.",
         "responsibilities": "Automate critical user journeys, maintain smoke test testbeds, and collaborate with developers on shift-left testing.",
@@ -456,11 +456,11 @@
         "daysAgo": 2,
         "freshness": "FRESH",
         "postedAt": "2d ago",
-        "createdAt": "2026-10-29T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-11-01T12:04:46.597Z",
+        "updatedAt": "2026-11-03T12:04:46.597Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_11",
+        "id": "jobvetta_jv_seed_11_wipro_cloud_solutions___aws_dev",
         "title": "Cloud Solutions & AWS DevOps Architect",
         "description": "Design multi-region cloud architectures, serverless microservices, and disaster recovery architectures for Global 2000 clients.",
         "responsibilities": "Lead cloud migration projects, write infrastructure as code, and implement security compliance policies.",
@@ -497,11 +497,11 @@
         "daysAgo": 3,
         "freshness": "RECENT",
         "postedAt": "3d ago",
-        "createdAt": "2026-10-28T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-10-31T12:04:46.602Z",
+        "updatedAt": "2026-11-03T12:04:46.602Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_12",
+        "id": "jobvetta_jv_seed_12_paytm_senior_react_native_mobil",
         "title": "Senior React Native Mobile Engineer",
         "description": "Develop high-scale mobile fintech features, QR merchant scanning, and instantaneous UPI payment processing flows.",
         "responsibilities": "Build scalable cross-platform components, optimize app bundle size, and reduce cold-start latency.",
@@ -538,11 +538,11 @@
         "daysAgo": 2,
         "freshness": "FRESH",
         "postedAt": "2d ago",
-        "createdAt": "2026-10-29T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-11-01T12:04:46.602Z",
+        "updatedAt": "2026-11-03T12:04:46.602Z"
       },
       {
-        "id": "jobvetta_jv_1793443283052_13",
+        "id": "jobvetta_jv_seed_13_cognizant_big_data___spark_streamin",
         "title": "Big Data & Spark Streaming Engineer",
         "description": "Build real-time streaming analytics pipelines handling terabytes of operational telemetry and IoT datasets.",
         "responsibilities": "Develop fault-tolerant data ingestion jobs, implement schema registry, and ensure data lineage.",
@@ -579,12 +579,12 @@
         "daysAgo": 4,
         "freshness": "RECENT",
         "postedAt": "4d ago",
-        "createdAt": "2026-10-27T10:41:23.052Z",
-        "updatedAt": "2026-10-31T10:41:23.052Z"
+        "createdAt": "2026-10-30T12:04:46.602Z",
+        "updatedAt": "2026-11-03T12:04:46.602Z"
       }
     ],
-    "cachedAt": 1793443283045,
-    "expiresAt": 1793445083045,
-    "hitCount": 7
+    "cachedAt": 1793707486594,
+    "expiresAt": 1793709286594,
+    "hitCount": 1
   }
 ]

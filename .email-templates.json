@@ -30,7 +30,7 @@
       "{user_first_name}"
     ],
     "subject": "Application Received: {job_title} at {company_name}",
-    "body": "Hi {candidate_name},\n\nThank you for your interest in joining {company_name}! We have received your application for the {job_title} position.\n\nOur recruiting team is currently reviewing your application and qualifications against the role requirements. We will reach out to you once there is an update on your candidacy.\n\nYou can also monitor your application progress anytime directly in your Jobbuffer portal.\n\nThank you again for considering {company_name} for the next step in your career!\n\nBest regards,\nTalent Acquisition Team\n{company_name}",
+    "body": "Hi {candidate_name},\n\nThank you for your interest in joining {company_name}! We have received your application for the {job_title} position.\n\nOur recruiting team is currently reviewing your application and qualifications against the role requirements. We will reach out to you once there is an update on your candidacy.\n\nYou can also monitor your application progress anytime directly in your JoBuffer portal.\n\nThank you again for considering {company_name} for the next step in your career!\n\nBest regards,\nTalent Acquisition Team\n{company_name}",
     "updatedAt": "2026-10-27T06:46:56.282Z"
   },
   "SHORTLISTED": {
@@ -47,7 +47,7 @@
       "{action_url}"
     ],
     "subject": "🎉 Congratulations! You have been Shortlisted for {job_title} at {company_name}",
-    "body": "Hello {candidate_name},\n\nGreat news! The hiring team at {company_name} has thoroughly reviewed your credentials and shortlisted your profile for the {job_title} role.\n\nNext Steps:\nOur hiring coordinator will be reaching out shortly to coordinate interview rounds and evaluate your schedule.\n\nYou can also check your applicant pipeline and upcoming milestones in your Jobbuffer dashboard:\n{action_url}\n\nCongratulations on making it to the shortlisted stage!\n\nWarm regards,\nHiring Team at {company_name}",
+    "body": "Hello {candidate_name},\n\nGreat news! The hiring team at {company_name} has thoroughly reviewed your credentials and shortlisted your profile for the {job_title} role.\n\nNext Steps:\nOur hiring coordinator will be reaching out shortly to coordinate interview rounds and evaluate your schedule.\n\nYou can also check your applicant pipeline and upcoming milestones in your JoBuffer dashboard:\n{action_url}\n\nCongratulations on making it to the shortlisted stage!\n\nWarm regards,\nHiring Team at {company_name}",
     "updatedAt": "2026-10-27T06:46:56.282Z"
   },
   "REJECTED": {
@@ -77,8 +77,8 @@
       "{candidate_name}",
       "{otp_code}"
     ],
-    "subject": "Your Jobbuffer Verification Code: {otp_code}",
-    "body": "Hello {candidate_name},\n\nThank you for creating an account with Jobbuffer.\n\nYour single-use email verification code is:\n{otp_code}\n\nThis verification code will expire in 15 minutes. For security reasons, please do not share this code with anyone.\n\nIf you did not request this verification, please safely disregard this email.\n\nBest regards,\nThe Jobbuffer Team",
+    "subject": "Your JoBuffer Verification Code: {otp_code}",
+    "body": "Hello {candidate_name},\n\nThank you for creating an account with JoBuffer.\n\nYour single-use email verification code is:\n{otp_code}\n\nThis verification code will expire in 15 minutes. For security reasons, please do not share this code with anyone.\n\nIf you did not request this verification, please safely disregard this email.\n\nBest regards,\nThe JoBuffer Team",
     "updatedAt": "2026-10-27T06:46:56.282Z"
   },
   "ANNOUNCEMENT": {
@@ -93,8 +93,8 @@
       "{company_name}",
       "{action_url}"
     ],
-    "subject": "📢 Important Update from Jobbuffer Platform Administration",
-    "body": "Hello {candidate_name},\n\nWe have an important announcement regarding upcoming platform enhancements and scheduled maintenance on Jobbuffer.\n\nPlease review the latest updates to make sure your recruiting and application workflows remain completely seamless.\n\nAccess your dashboard here:\n{action_url}\n\nThank you for being a valued member of the Jobbuffer community!\n\nBest regards,\nJobbuffer Global Administration",
+    "subject": "📢 Important Update from JoBuffer Platform Administration",
+    "body": "Hello {candidate_name},\n\nWe have an important announcement regarding upcoming platform enhancements and scheduled maintenance on JoBuffer.\n\nPlease review the latest updates to make sure your recruiting and application workflows remain completely seamless.\n\nAccess your dashboard here:\n{action_url}\n\nThank you for being a valued member of the JoBuffer community!\n\nBest regards,\nJoBuffer Global Administration",
     "updatedAt": "2026-10-27T06:46:56.282Z"
   },
   "JOB_OFFER": {
@@ -112,7 +112,7 @@
       "{user_first_name}"
     ],
     "subject": "🎉 Formal Job Offer: {job_title} at {company_name}",
-    "body": "Dear {candidate_name},\n\nOn behalf of {company_name}, we are delighted to offer you the position of {job_title}!\n\nWe were thoroughly impressed by your background, interviews, and experience throughout our recruitment process. We believe your leadership and technical skills will make an outstanding impact on our team.\n\nPlease review your formal offer letter and compensation package by signing into your Jobbuffer portal:\n{action_url}\n\nIf you have any questions, feel free to reply directly to this email.\n\nCongratulations once again! We look forward to welcoming you to the {company_name} team.\n\nWarmest regards,\n{user_first_name} & the Hiring Team at {company_name}",
+    "body": "Dear {candidate_name},\n\nOn behalf of {company_name}, we are delighted to offer you the position of {job_title}!\n\nWe were thoroughly impressed by your background, interviews, and experience throughout our recruitment process. We believe your leadership and technical skills will make an outstanding impact on our team.\n\nPlease review your formal offer letter and compensation package by signing into your JoBuffer portal:\n{action_url}\n\nIf you have any questions, feel free to reply directly to this email.\n\nCongratulations once again! We look forward to welcoming you to the {company_name} team.\n\nWarmest regards,\n{user_first_name} & the Hiring Team at {company_name}",
     "updatedAt": "2026-10-29T12:07:27.380Z"
   },
   "INVITATION": {
@@ -129,7 +129,7 @@
       "{action_url}"
     ],
     "subject": "Opportunity: We think you would be a great fit for {job_title} at {company_name}",
-    "body": "Hi {candidate_name},\n\nI came across your profile on Jobbuffer and was really impressed by your experience and accomplishments.\n\nWe are currently expanding our team at {company_name} and are looking for a talented {job_title}. Given your skillset, I believe this position would be an exciting next step in your career.\n\nYou can learn more about this role and submit your interest with 1 click here:\n{action_url}\n\nWould you be open to a brief chat this week to explore this further?\n\nBest regards,\nTalent Acquisition Team\n{company_name}",
+    "body": "Hi {candidate_name},\n\nI came across your profile on JoBuffer and was really impressed by your experience and accomplishments.\n\nWe are currently expanding our team at {company_name} and are looking for a talented {job_title}. Given your skillset, I believe this position would be an exciting next step in your career.\n\nYou can learn more about this role and submit your interest with 1 click here:\n{action_url}\n\nWould you be open to a brief chat this week to explore this further?\n\nBest regards,\nTalent Acquisition Team\n{company_name}",
     "updatedAt": "2026-10-29T12:07:27.380Z"
   },
   "7f5c4d4c-6970-4fc1-a7a3-3ace80edd3e5:SHORTLISTED": {
@@ -146,7 +146,7 @@
       "{action_url}"
     ],
     "subject": "🎉 Congratulations! You have been Shortlisted for {job_title} at {company_name}",
-    "body": "Hello {candidate_name},\n\nGreat news! The hiring team at Chennaiinfo has thoroughly reviewed your credentials and shortlisted your profile for the {job_title} role.\n\nNext Steps:\nOur hiring coordinator will be reaching out shortly to coordinate interview rounds and evaluate your schedule.\n\nYou can also check your applicant pipeline and upcoming milestones in your Jobbuffer dashboard:\n{action_url}\n\nCongratulations on making it to the shortlisted stage!\n\nWarm regards,\nHiring Team at Chennaiinfo",
+    "body": "Hello {candidate_name},\n\nGreat news! The hiring team at Chennaiinfo has thoroughly reviewed your credentials and shortlisted your profile for the {job_title} role.\n\nNext Steps:\nOur hiring coordinator will be reaching out shortly to coordinate interview rounds and evaluate your schedule.\n\nYou can also check your applicant pipeline and upcoming milestones in your JoBuffer dashboard:\n{action_url}\n\nCongratulations on making it to the shortlisted stage!\n\nWarm regards,\nHiring Team at Chennaiinfo",
     "updatedAt": "2026-10-30T04:53:38.415Z",
     "companyId": "7f5c4d4c-6970-4fc1-a7a3-3ace80edd3e5"
   }

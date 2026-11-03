@@ -20,13 +20,15 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 8000
 });
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://jobuffer.com';
+
 /**
  * Modern HTML wrapper that produces a clean, high-conversion email design
  */
 function wrapInBrandedLayout(
   title: string,
   bodyText: string,
-  companyName: string = 'Jobbuffer',
+  companyName: string = 'JoBuffer',
   actionButton?: { text: string; url: string }
 ): string {
   const paragraphs = bodyText
@@ -87,7 +89,7 @@ function wrapInBrandedLayout(
         This is an official candidate notification from ${companyName}.
       </p>
       <p style="margin: 0; color: #94A3B8;">
-        Delivered via Jobbuffer Recruitment Platform &copy; ${new Date().getFullYear()}
+        Delivered via JoBuffer Recruitment Platform &copy; ${new Date().getFullYear()}
       </p>
     </div>
 
@@ -106,7 +108,7 @@ export const sendOtpEmail = async (
   otp: string
 ): Promise<{ success: boolean; error?: string }> => {
   const fromAddress = process.env.SMTP_FROM || 'career@tridinsoftware.com';
-  const fromName = process.env.SMTP_FROM_NAME || 'Jobbuffer Careers';
+  const fromName = process.env.SMTP_FROM_NAME || 'JoBuffer Careers';
 
   const { subject, body } = templateService.render('REGISTRATION_OTP', {
     candidate_name: name || 'User',
@@ -116,14 +118,14 @@ export const sendOtpEmail = async (
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <h1 style="color: #2563EB; margin: 0; font-size: 28px; font-weight: bold; letter-spacing: 1px;">Jobbuffer</h1>
+        <h1 style="color: #2563EB; margin: 0; font-size: 28px; font-weight: bold; letter-spacing: 1px;">JoBuffer</h1>
         <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Career and Recruitment Platform</p>
       </div>
       <div style="padding: 24px; background-color: #f8fafc; border-radius: 8px; text-align: center;">
         <h2 style="color: #1e293b; margin-top: 0; font-size: 18px;">Email Verification</h2>
         <p style="color: #475569; font-size: 14px; line-height: 1.5;">
           Hello <strong>${name || 'Candidate'}</strong>,<br/>
-          Thank you for joining Jobbuffer. Use the single-use verification code below to verify your account:
+          Thank you for joining JoBuffer. Use the single-use verification code below to verify your account:
         </p>
         <div style="margin: 24px 0;">
           <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563EB; background: #eff6ff; padding: 12px 24px; border-radius: 8px; border: 1px dashed #3b82f6;">
@@ -135,7 +137,7 @@ export const sendOtpEmail = async (
         </p>
       </div>
       <div style="margin-top: 24px; text-align: center; color: #94a3b8; font-size: 12px;">
-        &copy; ${new Date().getFullYear()} Jobbuffer Technologies. All rights reserved.
+        &copy; ${new Date().getFullYear()} JoBuffer Technologies. All rights reserved.
       </div>
     </div>
   `;
@@ -191,7 +193,7 @@ export const sendApplicationReceivedEmail = async (
   companyId?: string
 ): Promise<{ success: boolean; error?: string }> => {
   const fromAddress = process.env.SMTP_FROM || 'career@tridinsoftware.com';
-  const fromName = companyName || 'Jobbuffer Careers';
+  const fromName = companyName || 'JoBuffer Careers';
 
   const firstName = (candidateName || 'Candidate').split(' ')[0];
   const { subject, body, customReplyTo, replyTo } = templateService.render(
@@ -209,7 +211,7 @@ export const sendApplicationReceivedEmail = async (
     subject,
     body,
     companyName,
-    { text: 'View Application Status', url: 'http://localhost:5173/login' }
+    { text: 'View Application Status', url: `${FRONTEND_URL}/login` }
   );
 
   try {
@@ -266,7 +268,7 @@ export const sendShortlistEmail = async (
   companyId?: string
 ): Promise<{ success: boolean; error?: string }> => {
   const fromAddress = process.env.SMTP_FROM || 'career@tridinsoftware.com';
-  const fromName = companyName || 'Jobbuffer Careers';
+  const fromName = companyName || 'JoBuffer Careers';
 
   const { subject, body, customReplyTo, replyTo } = templateService.render(
     'SHORTLISTED',
@@ -274,7 +276,7 @@ export const sendShortlistEmail = async (
       candidate_name: candidateName || 'Candidate',
       job_title: jobTitle,
       company_name: companyName,
-      action_url: 'http://localhost:5173/login'
+      action_url: `${FRONTEND_URL}/login`
     },
     companyId
   );
@@ -283,7 +285,7 @@ export const sendShortlistEmail = async (
     subject,
     body,
     companyName,
-    { text: 'Open Candidate Portal', url: 'http://localhost:5173/login' }
+    { text: 'Open Candidate Portal', url: `${FRONTEND_URL}/login` }
   );
 
   try {
@@ -340,7 +342,7 @@ export const sendRejectionEmail = async (
   companyId?: string
 ): Promise<{ success: boolean; error?: string }> => {
   const fromAddress = process.env.SMTP_FROM || 'career@tridinsoftware.com';
-  const fromName = companyName || 'Jobbuffer Careers';
+  const fromName = companyName || 'JoBuffer Careers';
 
   const { subject, body, customReplyTo, replyTo } = templateService.render(
     'REJECTED',
@@ -356,7 +358,7 @@ export const sendRejectionEmail = async (
     subject,
     body,
     companyName,
-    { text: 'Browse Other Opportunities', url: 'http://localhost:5173/login' }
+    { text: 'Browse Other Opportunities', url: `${FRONTEND_URL}/login` }
   );
 
   try {
@@ -418,7 +420,7 @@ export const sendInterviewReminderEmail = async (
   companyId?: string
 ): Promise<{ success: boolean; error?: string }> => {
   const fromAddress = process.env.SMTP_FROM || 'career@tridinsoftware.com';
-  const fromName = companyName || 'Jobbuffer Careers';
+  const fromName = companyName || 'JoBuffer Careers';
 
   const scheduledDate = new Date(interview.scheduledAt);
   const dateFormatted = scheduledDate.toLocaleDateString('en-US', {
@@ -436,7 +438,7 @@ export const sendInterviewReminderEmail = async (
   const user_first_name = recruiterNames[0] || 'Hiring';
   const user_last_name = recruiterNames.slice(1).join(' ') || 'Team';
 
-  const interview_url = interview.meetingLink || 'https://meet.google.com/jobbuffer-interview';
+  const interview_url = interview.meetingLink || 'https://meet.google.com/jobuffer-interview';
 
   const { subject, body, customReplyTo, replyTo } = templateService.render(
     'INTERVIEW_REMINDER',
@@ -515,7 +517,7 @@ export const sendJobOfferEmail = async (
   companyId?: string
 ): Promise<{ success: boolean; error?: string }> => {
   const fromAddress = process.env.SMTP_FROM || 'career@tridinsoftware.com';
-  const fromName = companyName || 'Jobbuffer Careers';
+  const fromName = companyName || 'JoBuffer Careers';
 
   const user_first_name = (recruiterName || 'Hiring').split(' ')[0];
 
@@ -526,7 +528,7 @@ export const sendJobOfferEmail = async (
       job_title: jobTitle,
       company_name: companyName,
       user_first_name,
-      action_url: 'http://localhost:5173/login'
+      action_url: `${FRONTEND_URL}/login`
     },
     companyId
   );
@@ -535,7 +537,7 @@ export const sendJobOfferEmail = async (
     subject,
     body,
     companyName,
-    { text: 'Review Job Offer Letter', url: 'http://localhost:5173/login' }
+    { text: 'Review Job Offer Letter', url: `${FRONTEND_URL}/login` }
   );
 
   try {
@@ -587,13 +589,13 @@ export const sendAnnouncementEmail = async (
   customReplyTo?: string
 ): Promise<{ success: boolean; error?: string }> => {
   const fromAddress = process.env.SMTP_FROM || 'career@tridinsoftware.com';
-  const fromName = process.env.SMTP_FROM_NAME || 'Jobbuffer Platform Admin';
+  const fromName = process.env.SMTP_FROM_NAME || 'JoBuffer Platform Admin';
 
   const html = wrapInBrandedLayout(
     subject,
     bodyText,
-    'Jobbuffer Platform',
-    { text: 'Open Platform', url: 'http://localhost:5173/login' }
+    'JoBuffer Platform',
+    { text: 'Open Platform', url: `${FRONTEND_URL}/login` }
   );
 
   try {

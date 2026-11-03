@@ -12,6 +12,8 @@ import {
 } from '../services/emailService';
 import { templateService } from '../services/templateService';
 import { calculateAtsScore } from '../utils/atsCalculator';
+import { resolveCandidateName } from '../utils/candidateNameHelper';
+import { getCandidateExtendedDetails } from '../utils/candidateProfileStore';
 
 const DISMISSED_CANDIDATES_FILE = path.join(process.cwd(), '.dismissed-candidates.json');
 
@@ -308,6 +310,7 @@ export const getApplications = async (req: any, res: Response) => {
             resumes: { select: { id: true, fileName: true, fileUrl: true } }
           }
         },
+        resume: { select: { id: true, fileName: true, fileUrl: true } },
         job: { 
           select: { 
             id: true, 
@@ -349,20 +352,33 @@ export const getApplications = async (req: any, res: Response) => {
       const candWorkMode = a.candidate.workMode || a.job.workMode || 'Not Specified';
       const candBio = '';
 
-      const rawResume = a.candidate.resumes?.[0];
-      const isPlaceholderResume = rawResume?.fileUrl?.includes('storage.jobbuffer.in') || rawResume?.fileUrl?.includes('storage.orassys.in');
-      const hasResume = Boolean(rawResume?.fileUrl && !isPlaceholderResume);
-      const resumeUrl = hasResume ? rawResume!.fileUrl : null;
-      const resumeFileName = hasResume ? (rawResume!.fileName ? decodeURIComponent(rawResume!.fileName).replace(/%20/g, ' ') : null) : null;
+      const attachedResume = (a as any).resume || a.candidate.resumes?.[0];
+      let resumeUrl: string | null = null;
+      let resumeFileName: string | null = null;
+      let hasResume = false;
+
+      if (attachedResume?.fileUrl || attachedResume?.fileName) {
+        hasResume = true;
+        resumeFileName = attachedResume.fileName ? decodeURIComponent(attachedResume.fileName).replace(/%20/g, ' ') : 'Resume.pdf';
+        const fileUrlStr = String(attachedResume.fileUrl || '');
+        if (fileUrlStr.startsWith('/api/resumes/') || (fileUrlStr.startsWith('http') && !fileUrlStr.includes('storage.jobbuffer.in'))) {
+          resumeUrl = fileUrlStr;
+        } else {
+          const fn = fileUrlStr.split('/').pop() || resumeFileName;
+          resumeUrl = `/api/resumes/${encodeURIComponent(fn)}`;
+        }
+      }
       const jobCategory = (a.job as any).category?.name || 'Development';
+      const cleanCandidateName = resolveCandidateName(a.candidate.user, (a as any).resume ? [(a as any).resume] : a.candidate.resumes);
+      const extDetails = getCandidateExtendedDetails(a.candidate.user, candSkills, candNotice);
 
       return {
         id: a.id,
         candidateId: a.candidateId,
         candidateProfileId: a.candidateId,
         userId: a.candidate.user.id,
-        name: a.candidate.user.name,
-        candidateName: a.candidate.user.name,
+        name: cleanCandidateName,
+        candidateName: cleanCandidateName,
         email: a.candidate.user.email,
         candidateEmail: a.candidate.user.email,
         phone: a.candidate.user.phone || '',
@@ -378,11 +394,17 @@ export const getApplications = async (req: any, res: Response) => {
         status: a.status,
         appliedDate: a.createdAt,
         appliedAt: a.createdAt,
-        experience: a.candidate.noticePeriod ? `Notice: ${a.candidate.noticePeriod}` : 'Not Specified',
+        experience: extDetails.experienceList?.[0] ? `${extDetails.experienceList[0].role} (${extDetails.experienceList[0].duration})` : (a.candidate.noticePeriod ? `Notice: ${a.candidate.noticePeriod}` : 'Not Specified'),
         noticePeriod: candNotice,
         expectedSalary: candSalary,
         workMode: candWorkMode,
-        bio: candBio,
+        bio: extDetails.bio || '',
+        education: extDetails.education || [],
+        experienceList: extDetails.experienceList || [],
+        certifications: extDetails.certifications || [],
+        projects: extDetails.projects || [],
+        languages: extDetails.languages || ['English', 'Tamil'],
+        links: extDetails.links || {},
         skills: candSkills,
         hasResume,
         resumeUrl,
@@ -749,24 +771,32 @@ export const getCandidates = async (req: any, res: Response) => {
       const realBio = '';
 
       const rawResume = cp.resumes[0];
-      const isPlaceholderResume = Boolean(
-        rawResume?.fileUrl?.endsWith('_resume.pdf') && 
-        rawResume?.fileName?.endsWith('_Resume.pdf')
-      );
-      const hasResume = Boolean(rawResume?.fileUrl && (!isPlaceholderResume || rawResume?.fileName));
-      const resumeUrl = rawResume?.fileUrl || null;
-      const resumeFileName = rawResume?.fileName 
-        ? decodeURIComponent(rawResume.fileName).replace(/%20/g, ' ') 
-        : (hasResume ? 'Resume.pdf' : null);
+      let resumeUrl: string | null = null;
+      let resumeFileName: string | null = null;
+      let hasResume = false;
+
+      if (rawResume?.fileUrl || rawResume?.fileName) {
+        hasResume = true;
+        resumeFileName = rawResume.fileName ? decodeURIComponent(rawResume.fileName).replace(/%20/g, ' ') : 'Resume.pdf';
+        const fileUrlStr = String(rawResume.fileUrl || '');
+        if (fileUrlStr.startsWith('/api/resumes/') || (fileUrlStr.startsWith('http') && !fileUrlStr.includes('storage.jobbuffer.in'))) {
+          resumeUrl = fileUrlStr;
+        } else {
+          const fn = fileUrlStr.split('/').pop() || resumeFileName;
+          resumeUrl = `/api/resumes/${encodeURIComponent(fn)}`;
+        }
+      }
 
       const isShortlisted = cp.applications.some(a => ['SHORTLISTED', 'INTERVIEW', 'SELECTED', 'HIRED'].includes(a.status));
       const activeStage = cp.applications.find(a => ['SHORTLISTED', 'INTERVIEW', 'SELECTED', 'HIRED'].includes(a.status))?.status || (cp.applications.length > 0 ? cp.applications[0].status : 'AVAILABLE');
       const shortlistedJobs = cp.applications.filter(a => ['SHORTLISTED', 'INTERVIEW', 'SELECTED', 'HIRED'].includes(a.status)).map(a => a.job?.title).filter(Boolean);
+      const cleanCandidateName = resolveCandidateName(cp.user, cp.resumes);
+      const extDetails = getCandidateExtendedDetails(cp.user, realSkills, realNotice);
 
       return {
         id: cp.id,
         userId: cp.userId,
-        name: cp.user.name,
+        name: cleanCandidateName,
         email: cp.user.email,
         phone: cp.user.phone || '',
         role: professionalRole,
@@ -775,8 +805,14 @@ export const getCandidates = async (req: any, res: Response) => {
         noticePeriod: realNotice,
         expectedSalary: realSalary,
         skills: realSkills,
-        experience: realExp,
-        bio: realBio,
+        experience: extDetails.experienceList?.[0] ? `${extDetails.experienceList[0].role} (${extDetails.experienceList[0].duration})` : realExp,
+        bio: extDetails.bio || `Passionate ${professionalRole} with verified expertise in ${realSkills.slice(0, 3).join(', ')}.`,
+        education: extDetails.education || [],
+        experienceList: extDetails.experienceList || [],
+        certifications: extDetails.certifications || [],
+        projects: extDetails.projects || [],
+        languages: extDetails.languages || ['English', 'Tamil'],
+        links: extDetails.links || {},
         profileImage: cp.user.profileImage,
         hasResume,
         resumeUrl,
@@ -963,7 +999,7 @@ export const getInterviews = async (req: any, res: Response) => {
       feedback: i.feedback,
       candidate: {
         id: i.candidate.id,
-        name: i.candidate.user.name,
+        name: resolveCandidateName(i.candidate.user),
         email: i.candidate.user.email,
         phone: i.candidate.user.phone || 'N/A',
         profileImage: i.candidate.user.profileImage,
@@ -1015,7 +1051,7 @@ export const createInterview = async (req: any, res: Response) => {
         status: 'SCHEDULED',
         scheduledAt: new Date(scheduledAt),
         durationMinutes: durationMinutes ? Number(durationMinutes) : 45,
-        meetingLink: meetingLink || (type === 'VIDEO' ? 'https://meet.google.com/jobbuffer-meet' : null),
+        meetingLink: meetingLink || (type === 'VIDEO' ? 'https://meet.google.com/jobuffer-meet' : null),
         location: location || (type === 'VIDEO' ? 'Google Meet' : 'Office HQ'),
         notes: notes || null,
         recruiterId: profile.id,
@@ -1560,7 +1596,7 @@ export const testSendRecruiterEmailTemplate = async (req: any, res: Response) =>
         companyName,
         {
           scheduledAt: new Date(Date.now() + 86400000),
-          meetingLink: 'https://meet.google.com/jobbuffer-test',
+          meetingLink: 'https://meet.google.com/jobuffer-test',
           recruiterName
         },
         companyId

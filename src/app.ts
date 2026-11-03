@@ -14,6 +14,9 @@ import { errorHandler } from './middleware/errorHandler';
 
 import path from 'path';
 import fs from 'fs';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 const app = express();
 
@@ -57,9 +60,13 @@ app.get('/health', (req: Request, res: Response) => {
 // Dedicated Resume Preview & Download Handler
 app.get([
   '/api/resumes/:filename', 
+  '/api/v1/api/resumes/:filename',
+  '/api/v1/resumes/:filename',
   '/api/recruiter/resumes/:filename',
-  '/api/candidates/resume/:filename'
-], (req: Request, res: Response) => {
+  '/api/v1/recruiter/resumes/:filename',
+  '/api/candidates/resume/:filename',
+  '/api/v1/candidates/resume/:filename'
+], async (req: Request, res: Response) => {
   try {
     const rawParam = req.params.filename;
     const rawFilename = Array.isArray(rawParam) ? rawParam[0] : (rawParam || '');
@@ -69,44 +76,78 @@ app.get([
     const filename = decodeURIComponent(String(rawFilename));
     const directPath = path.join(uploadsDir, filename);
 
-    if (fs.existsSync(directPath)) {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader(
-        'Content-Disposition',
-        `${download ? 'attachment' : 'inline'}; filename="${filename}"`
+    // Determine target file to send
+    let targetPath = '';
+    if (fs.existsSync(directPath) && fs.statSync(directPath).isFile()) {
+      targetPath = directPath;
+    } else {
+      // Case-insensitive or partial name fallback
+      const availableFiles = fs.readdirSync(uploadsDir);
+      const cleanTarget = filename.toLowerCase().replace(/(_resume)?\.(pdf|docx?)$/i, '');
+      const matched = availableFiles.find(
+        f => f.toLowerCase() === filename.toLowerCase() ||
+             f.toLowerCase().includes(cleanTarget) ||
+             (cleanTarget.length >= 4 && cleanTarget.includes(f.toLowerCase().replace(/(_resume)?\.(pdf|docx?)$/i, '')))
       );
-      return res.sendFile(directPath);
+
+      if (matched) {
+        targetPath = path.join(uploadsDir, matched);
+      } else {
+        const anyPdf = availableFiles.find(f => f.toLowerCase().endsWith('.pdf'));
+        if (anyPdf) {
+          targetPath = path.join(uploadsDir, anyPdf);
+        }
+      }
     }
 
-    // Case-insensitive or partial name fallback
-    const availableFiles = fs.readdirSync(uploadsDir);
-    const matched = availableFiles.find(
-      f => f.toLowerCase() === filename.toLowerCase() ||
-           f.toLowerCase().includes(filename.toLowerCase().replace(/_resume\.pdf$/i, ''))
+    if (!targetPath || !fs.existsSync(targetPath)) {
+      return res.status(404).json({ message: 'Resume document not found' });
+    }
+
+    // Determine human-friendly download name
+    let cleanDisplayName = (req.query.name as string) || (req.query.candidateName as string) || (req.query.filename as string);
+    if (!cleanDisplayName) {
+      try {
+        const resumeRecord = await prisma.resume.findFirst({
+          where: {
+            OR: [
+              { fileUrl: { contains: filename } },
+              { fileName: { contains: filename } }
+            ]
+          },
+          include: { candidate: { include: { user: true } } }
+        });
+        if (resumeRecord) {
+          cleanDisplayName = resumeRecord.fileName || `${resumeRecord.candidate.user.name || 'Candidate'}_Resume.pdf`;
+        }
+      } catch {}
+    }
+    if (!cleanDisplayName) {
+      cleanDisplayName = filename;
+    }
+    cleanDisplayName = decodeURIComponent(cleanDisplayName).replace(/%20/g, ' ').trim();
+    if (!cleanDisplayName.toLowerCase().endsWith('.pdf') && !cleanDisplayName.toLowerCase().endsWith('.docx')) {
+      cleanDisplayName += '.pdf';
+    }
+
+    const isDocx = targetPath.toLowerCase().endsWith('.docx');
+    const isDoc = targetPath.toLowerCase().endsWith('.doc');
+    const contentType = isDocx 
+      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : isDoc 
+        ? 'application/msword' 
+        : 'application/pdf';
+
+    const safeAsciiName = cleanDisplayName.replace(/[^\x20-\x7E]/g, '_');
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `${download ? 'attachment' : 'inline'}; filename="${safeAsciiName}"; filename*="UTF-8''${encodeURIComponent(cleanDisplayName)}"`
     );
+    res.setHeader('Cache-Control', 'public, max-age=3600');
 
-    if (matched) {
-      const matchedPath = path.join(uploadsDir, matched);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader(
-        'Content-Disposition',
-        `${download ? 'attachment' : 'inline'}; filename="${filename.endsWith('.pdf') ? filename : filename + '.pdf'}"`
-      );
-      return res.sendFile(matchedPath);
-    }
-
-    // Default sample PDF if specific file not present
-    const anyPdf = availableFiles.find(f => f.toLowerCase().endsWith('.pdf'));
-    if (anyPdf) {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader(
-        'Content-Disposition',
-        `${download ? 'attachment' : 'inline'}; filename="${filename}"`
-      );
-      return res.sendFile(path.join(uploadsDir, anyPdf));
-    }
-
-    return res.status(404).json({ message: 'Resume document not found' });
+    return res.sendFile(targetPath);
   } catch (err: any) {
     console.error('Error serving resume:', err);
     return res.status(500).json({ message: 'Error retrieving resume' });
