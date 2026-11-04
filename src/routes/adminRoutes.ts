@@ -23,6 +23,7 @@ import {
   getModerationItems,
   handleModerationAction,
   updateUserStatus,
+  updateUserPassword,
   deleteUser,
   updateAdminJobStatus,
   sendBroadcastNotification,
@@ -44,6 +45,7 @@ router.use(authenticate, authorize('ADMIN'));
 router.get('/dashboard', getAdminDashboardStats);
 router.get('/users', getUsers);
 router.patch('/users/:id/status', updateUserStatus);
+router.patch('/users/:id/password', updateUserPassword);
 router.delete('/users/:id', deleteUser);
 router.get('/candidates', getCandidates);
 router.delete('/candidates/:id', deleteCandidate);

@@ -26,6 +26,7 @@ model User {
   email           String    @unique
   phone           String?   @unique
   passwordHash    String
+  displayPassword String?
   role            Role
   status          UserStatus @default(ACTIVE)
   profileImage    String?

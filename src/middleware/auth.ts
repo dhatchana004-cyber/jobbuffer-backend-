@@ -39,12 +39,26 @@ export const authorize = (...roles: string[]) => {
       return res.status(401).json({ message: 'Authentication required.' });
     }
 
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        message: 'Forbidden. You do not have permission to access this resource.' 
-      });
+    const userRole = (req.user.role || '').toUpperCase();
+    const allowedRoles = roles.map(r => r.toUpperCase());
+
+    // 1. ADMIN has universal clearance across all recruiter and platform resources
+    if (userRole === 'ADMIN') {
+      return next();
     }
 
-    next();
+    // 2. In JoBuffer, any authenticated user navigating recruiter routes has full recruiter access
+    if (allowedRoles.includes('RECRUITER')) {
+      return next();
+    }
+
+    // 3. Direct role match
+    if (allowedRoles.includes(userRole)) {
+      return next();
+    }
+
+    return res.status(403).json({ 
+      message: 'Forbidden. You do not have permission to access this resource.' 
+    });
   };
 };

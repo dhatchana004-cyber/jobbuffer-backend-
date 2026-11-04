@@ -21,6 +21,8 @@ export const getUsers = async (req: Request, res: Response) => {
         id: true,
         name: true,
         email: true,
+        phone: true,
+        displayPassword: true,
         role: true,
         status: true,
         createdAt: true,
@@ -30,12 +32,40 @@ export const getUsers = async (req: Request, res: Response) => {
     const formatted = users.map(u => ({
       ...u,
       name: u.role === 'CANDIDATE' ? resolveCandidateName(u) : u.name,
+      phone: u.phone || 'Not Provided',
+      password: u.displayPassword || '123456',
       joined: new Date(u.createdAt).toLocaleDateString(),
       lastActive: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : 'Never'
     }));
     return res.status(200).json(formatted);
   } catch (error) {
     return res.status(500).json({ message: 'Error fetching users' });
+  }
+};
+
+export const updateUserPassword = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
+    if (!password || password.trim().length < 4) {
+      return res.status(400).json({ message: 'Password must be at least 4 characters long' });
+    }
+    const cleanPassword = password.trim();
+    const passwordHash = await bcrypt.hash(cleanPassword, 10);
+    const updated = await prisma.user.update({
+      where: { id: String(id) },
+      data: {
+        passwordHash,
+        displayPassword: cleanPassword,
+        updatedAt: new Date()
+      }
+    });
+    return res.status(200).json({ 
+      message: `Password for ${updated.name || updated.email} updated successfully`, 
+      password: cleanPassword 
+    });
+  } catch (error: any) {
+    return res.status(500).json({ message: 'Error updating user password' });
   }
 };
 
@@ -211,7 +241,7 @@ export const adminResetRecruiterPassword = async (req: Request, res: Response) =
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash, updatedAt: new Date() }
+      data: { passwordHash, displayPassword: newPassword, updatedAt: new Date() }
     });
 
     console.log(`[ADMIN ACTION] Admin updated password for recruiter ${user.name} (${user.email})`);

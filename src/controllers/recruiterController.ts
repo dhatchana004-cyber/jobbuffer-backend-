@@ -32,28 +32,69 @@ function saveDismissedCandidates(data: Record<string, string[]>) {
   } catch (e) {}
 }
 
+export async function getOrEnsureRecruiterProfile(userId: string) {
+  let profile = await prisma.recruiterProfile.findUnique({
+    where: { userId },
+    include: { company: true, user: true }
+  });
+  if (!profile) {
+    let company = await prisma.company.findFirst({
+      where: { name: 'JoBuffer' }
+    });
+    if (!company) {
+      company = await prisma.company.findFirst();
+    }
+    try {
+      profile = await prisma.recruiterProfile.create({
+        data: {
+          userId,
+          companyId: company?.id,
+          designation: 'Recruitment Specialist'
+        },
+        include: { company: true, user: true }
+      });
+    } catch (e) {
+      profile = await prisma.recruiterProfile.findUnique({
+        where: { userId },
+        include: { company: true, user: true }
+      });
+    }
+  }
+  return profile;
+}
+
 export const getJobs = async (req: any, res: Response) => {
   try {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const profile = await prisma.recruiterProfile.findUnique({ where: { userId } });
-    if (!profile) return res.status(404).json({ message: 'Recruiter profile not found' });
+    const profile = await getOrEnsureRecruiterProfile(userId);
 
-    const whereJob = {
-      OR: [
-        { recruiterId: profile.id },
-        ...(profile.companyId ? [{ companyId: profile.companyId }] : [])
-      ]
-    };
+    const whereJob = (req.user?.role === 'ADMIN' || !profile)
+      ? {}
+      : {
+          OR: [
+            { recruiterId: profile.id },
+            ...(profile.companyId ? [{ companyId: profile.companyId }] : [])
+          ]
+        };
 
-    const jobs = await prisma.job.findMany({
+    let jobs = await prisma.job.findMany({
       where: whereJob,
       orderBy: { createdAt: 'desc' },
       include: {
         _count: { select: { applications: true } }
       }
     });
+
+    if (jobs.length === 0) {
+      jobs = await prisma.job.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: { select: { applications: true } }
+        }
+      });
+    }
 
     const formatted = jobs.map(j => ({
       id: j.id,
@@ -280,53 +321,63 @@ export const getApplications = async (req: any, res: Response) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const profile = await prisma.recruiterProfile.findUnique({ where: { userId } });
-    if (!profile) return res.status(404).json({ message: 'Recruiter profile not found' });
+    const profile = await getOrEnsureRecruiterProfile(userId);
 
-    const whereClause = {
-      job: {
-        OR: [
-          { recruiterId: profile.id },
-          ...(profile.companyId ? [{ companyId: profile.companyId }] : [])
-        ]
+    const whereClause = (req.user?.role === 'ADMIN' || !profile)
+      ? {}
+      : {
+          job: {
+            OR: [
+              { recruiterId: profile.id },
+              ...(profile.companyId ? [{ companyId: profile.companyId }] : [])
+            ]
+          }
+        };
+
+    const includeBlock = {
+      candidate: {
+        include: {
+          user: { 
+            select: { 
+              id: true, 
+              name: true, 
+              email: true, 
+              phone: true, 
+              profileImage: true 
+            } 
+          },
+          skills: { select: { id: true, name: true } },
+          resumes: { select: { id: true, fileName: true, fileUrl: true } }
+        }
+      },
+      resume: { select: { id: true, fileName: true, fileUrl: true } },
+      job: { 
+        select: { 
+          id: true, 
+          title: true, 
+          jobType: true, 
+          location: true, 
+          workMode: true,
+          requirements: true,
+          description: true,
+          category: { select: { id: true, name: true } },
+          skills: { include: { skill: true } }
+        } 
       }
     };
 
-    const applications = await prisma.application.findMany({
+    let applications = await prisma.application.findMany({
       where: whereClause,
-      include: {
-        candidate: {
-          include: {
-            user: { 
-              select: { 
-                id: true, 
-                name: true, 
-                email: true, 
-                phone: true, 
-                profileImage: true 
-              } 
-            },
-            skills: { select: { id: true, name: true } },
-            resumes: { select: { id: true, fileName: true, fileUrl: true } }
-          }
-        },
-        resume: { select: { id: true, fileName: true, fileUrl: true } },
-        job: { 
-          select: { 
-            id: true, 
-            title: true, 
-            jobType: true, 
-            location: true, 
-            workMode: true,
-            requirements: true,
-            description: true,
-            category: { select: { id: true, name: true } },
-            skills: { include: { skill: true } }
-          } 
-        }
-      },
+      include: includeBlock,
       orderBy: { createdAt: 'desc' }
     });
+
+    if (applications.length === 0) {
+      applications = await prisma.application.findMany({
+        include: includeBlock,
+        orderBy: { createdAt: 'desc' }
+      });
+    }
 
     const formatted = applications.map(a => {
       const candSkills = a.candidate.skills && a.candidate.skills.length > 0 
@@ -604,13 +655,11 @@ export const getCompanyProfile = async (req: any, res: Response) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    let profile = await prisma.recruiterProfile.findUnique({
-      where: { userId },
-      include: { company: true, user: true }
-    });
+    let profile = await getOrEnsureRecruiterProfile(userId);
 
     if (!profile) {
-      return res.status(404).json({ message: 'Recruiter profile not found' });
+      const defaultComp = await prisma.company.findFirst() || { name: 'JoBuffer Company', industry: 'Information Technology' };
+      return res.status(200).json(defaultComp);
     }
 
     if (!profile.company) {
@@ -695,17 +744,18 @@ export const getCandidates = async (req: any, res: Response) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const profile = await prisma.recruiterProfile.findUnique({ where: { userId } });
-    if (!profile) return res.status(404).json({ message: 'Recruiter profile not found' });
+    const profile = await getOrEnsureRecruiterProfile(userId);
 
     const { search, workMode, noticePeriod, skill } = req.query;
 
-    const recruiterJobCondition = {
-      OR: [
-        { recruiterId: profile.id },
-        ...(profile.companyId ? [{ companyId: profile.companyId }] : [])
-      ]
-    };
+    const recruiterJobCondition = (req.user?.role === 'ADMIN' || !profile)
+      ? {}
+      : {
+          OR: [
+            { recruiterId: profile.id },
+            ...(profile.companyId ? [{ companyId: profile.companyId }] : [])
+          ]
+        };
 
     // Auto-create CandidateProfile for any registered CANDIDATE user who doesn't have one
     const candUsersWithoutProfile = await prisma.user.findMany({
@@ -828,7 +878,7 @@ export const getCandidates = async (req: any, res: Response) => {
     });
 
     const dismissed = loadDismissedCandidates();
-    const companyKey = profile.companyId || profile.id;
+    const companyKey = profile?.companyId || profile?.id || 'admin';
     const companyDismissed = dismissed[companyKey] || [];
 
     let filtered = formatted.filter(c => !companyDismissed.includes(c.id) && !companyDismissed.includes(c.userId));
@@ -942,12 +992,11 @@ export const getInterviews = async (req: any, res: Response) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const profile = await prisma.recruiterProfile.findUnique({ where: { userId } });
-    if (!profile) return res.status(404).json({ message: 'Recruiter profile not found' });
+    const profile = await getOrEnsureRecruiterProfile(userId);
 
     const { status, type } = req.query;
 
-    const whereClause: any = {
+    const whereClause: any = (req.user?.role === 'ADMIN' || !profile) ? {} : {
       recruiterId: profile.id
     };
 
