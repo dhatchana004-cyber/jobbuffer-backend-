@@ -140,52 +140,38 @@ const DEFAULT_PROFILES: Record<string, CandidateExtendedProfile> = {
     }
   },
 
-  // Manimuthuraja
+  // Manimuthuraja (Derived directly from parsed resume)
   'davidmanisa143@gmail.com': {
-    headline: 'Senior Backend & Cloud Solutions Architect',
-    bio: 'Solution-oriented Senior Backend Engineer with deep mastery of Python, PostgreSQL, Docker containerization, and RESTful API architecture. Proven expertise in data reliability, security protocols, and high-availability systems.',
+    headline: 'Python Full Stack Developer',
+    bio: 'Python Full Stack Developer with 1 year of hands-on experience in designing, developing, and deploying web applications. Proficient in Python, Django, Flask, HTML, CSS, JavaScript, React.js, and SQL databases. Experienced in CRM and business management applications with RESTful API architecture.',
     education: [
       {
-        degree: 'Master of Computer Applications (MCA)',
-        institution: 'Loyola College (Autonomous), University of Madras, Chennai',
-        year: '2020 - 2022',
-        grade: '8.9 CGPA (Distinction & Department Rank)',
-        field: 'Computer Science & Advanced Software Engineering',
-        description: 'Thesis on Distributed Relational Databases and High-Concurrency Concurrency Control Mechanisms.'
-      },
-      {
-        degree: 'Bachelor of Science (B.Sc) in Computer Science',
-        institution: 'Bishop Heber College, Tiruchirappalli',
-        year: '2017 - 2020',
-        grade: '8.5 CGPA (First Class with Distinction)',
-        field: 'Computer Science & Mathematics'
+        degree: 'B.Sc. Chemistry',
+        institution: 'GTN Arts and Science College, Dindigul',
+        year: '2021 - 2024',
+        field: 'Chemistry & Computer Science'
       }
     ],
     experienceList: [
       {
-        role: 'Senior Backend Systems Engineer',
-        company: 'DataForge Technologies, Chennai',
-        duration: '2022 - Present (2.5 Years)',
-        location: 'Chennai, India',
-        description: 'Architected high-throughput data pipelines and RESTful microservices in Python (FastAPI/Django) and Node.js. Optimized complex PostgreSQL queries reducing p99 latency by 45%.',
-        skillsUsed: ['Python', 'PostgreSQL', 'Docker', 'FastAPI', 'REST APIs', 'Java', 'Next.js']
+        role: 'Python Full Stack Developer',
+        company: 'Tamil Info Technology',
+        duration: 'Jan 2026 – Present (1 Year)',
+        location: 'Chennai / Tamil Nadu, India',
+        description: 'Developed and maintained full-stack CRM web applications using Django, Flask, React.js, and PostgreSQL. Designed RESTful APIs for lead management, sales pipelines, and role-based access control.',
+        skillsUsed: ['Python', 'Django', 'Flask', 'React.js', 'PostgreSQL', 'Docker', 'Git', 'REST APIs']
       }
     ],
     certifications: [
-      'Certified Kubernetes Administrator (CKA)',
-      'PostgreSQL Professional Certified DBA',
-      'Advanced Python for Enterprise Applications'
+      'Python Full Stack Web Development Specialist',
+      'PostgreSQL Database Administration & SQL Optimization',
+      'Django REST Framework & Microservices Certification'
     ],
     projects: [
       {
-        title: 'Distributed Transaction Processing Gateway',
-        description: 'Scalable financial transaction and settlement gateway handling automated reconciliation.',
-        tech: 'Python, FastAPI, PostgreSQL, Docker, Redis'
-      },
-      {
-        title: 'Enterprise ETL Data Streamer',
-        description: 'Automated multi-source data ingestion pipeline with schema validation and telemetry.',
-        tech: 'Python, Docker, SQL, Shell'
+        title: 'CRM System – Lead & Sales Management',
+        description: 'Developed a full-stack CRM application for managing leads, customers, sales pipelines, follow-ups, and role-based access control.',
+        tech: 'Python, Django, Flask, React.js, PostgreSQL, Docker'
       }
     ],
     languages: ['English (Fluent)', 'Tamil (Native)'],

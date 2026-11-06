@@ -1,5 +1,41 @@
 [
   {
+    "id": "log_1793866615727_hgvx3",
+    "recipientEmail": "davidmanisa143@gmail.com",
+    "recipientName": "Manimuthuraja",
+    "subject": "🎉 Congratulations! You have been Shortlisted for Technical Talent Acquisition Specialist at Chennaiinfo",
+    "bodySnippet": "Shortlisted for: Technical Talent Acquisition Specialist",
+    "templateCode": "SHORTLISTED",
+    "companyId": null,
+    "status": "DELIVERED",
+    "channel": "EMAIL",
+    "sentAt": "2026-11-05T08:16:55.727Z"
+  },
+  {
+    "id": "log_1793862804342_tpoir",
+    "recipientEmail": "davidmanisa143@gmail.com",
+    "recipientName": "Manimuthuraja",
+    "subject": "Application Received: Technical Talent Acquisition Specialist at Chennaiinfo",
+    "bodySnippet": "Job: Technical Talent Acquisition Specialist at Chennaiinfo",
+    "templateCode": "APPLICATION_RECEIVED",
+    "companyId": "7f5c4d4c-6970-4fc1-a7a3-3ace80edd3e5",
+    "status": "DELIVERED",
+    "channel": "EMAIL",
+    "sentAt": "2026-11-05T07:13:24.343Z"
+  },
+  {
+    "id": "log_1793855359149_eevo1",
+    "recipientEmail": "davidmanisa143@gmail.com",
+    "recipientName": "Manimuthuraja",
+    "subject": "Application Received: Cybersecurity Analyst & Threat Hunter at Chennaiinfo",
+    "bodySnippet": "Job: Cybersecurity Analyst & Threat Hunter at Chennaiinfo",
+    "templateCode": "APPLICATION_RECEIVED",
+    "companyId": "7f5c4d4c-6970-4fc1-a7a3-3ace80edd3e5",
+    "status": "DELIVERED",
+    "channel": "EMAIL",
+    "sentAt": "2026-11-05T05:09:19.149Z"
+  },
+  {
     "id": "log_1793704772928_i3i7t",
     "recipientEmail": "davidmanisa143@gmail.com",
     "recipientName": "Manimuthuraja",

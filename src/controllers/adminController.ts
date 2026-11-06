@@ -328,6 +328,7 @@ export const getAdminApplications = async (req: Request, res: Response) => {
             company: { select: { id: true, name: true, logo: true } }
           }
         },
+        resume: { select: { id: true, fileName: true, fileUrl: true } },
         candidate: {
           include: {
             user: { select: { id: true, name: true, email: true, phone: true } },
@@ -354,7 +355,7 @@ export const getAdminApplications = async (req: Request, res: Response) => {
       );
 
       const extDetails = getCandidateExtendedDetails(app.candidate.user, candSkills);
-      const rawResume = app.candidate.resumes[0];
+      const rawResume = (app as any).resume || app.candidate.resumes[0];
       let resumeUrl: string | null = null;
       let resumeFileName: string | null = null;
       let hasResume = false;

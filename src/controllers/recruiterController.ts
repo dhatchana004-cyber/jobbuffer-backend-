@@ -129,6 +129,34 @@ export const createJob = async (req: any, res: Response) => {
       return res.status(404).json({ message: 'Recruiter profile not found' });
     }
 
+    // Enforce Monthly Job Posting Limits based on Plan: FREE = 10, PRO = 50
+    const plan = (profile.plan || 'FREE').toUpperCase();
+    const isPro = plan === 'PRO';
+    const maxMonthlyJobs = isPro ? 50 : 10;
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const monthlyJobsPosted = await prisma.job.count({
+      where: {
+        recruiterId: profile.id,
+        createdAt: { gte: startOfMonth, lte: endOfMonth }
+      }
+    });
+
+    if (monthlyJobsPosted >= maxMonthlyJobs) {
+      return res.status(403).json({
+        message: isPro
+          ? `You have reached your PRO plan monthly limit of 50 job postings.`
+          : `You have reached your FREE plan monthly limit of 10 job postings. Upgrade to PRO to post up to 50 jobs monthly!`,
+        code: 'JOB_LIMIT_EXCEEDED',
+        plan,
+        limit: maxMonthlyJobs,
+        monthlyJobsPosted
+      });
+    }
+
     const {
       title,
       category,
@@ -905,7 +933,30 @@ export const getCandidates = async (req: any, res: Response) => {
       filtered = filtered.filter(c => (c.skills || []).some((s: string) => (s || '').toLowerCase() === sk));
     }
 
-    return res.status(200).json(filtered);
+    // Enforce Candidate Profile Viewing Limits: FREE = 50, PRO = 100
+    const plan = (profile?.plan || 'FREE').toUpperCase();
+    const isPro = plan === 'PRO';
+    const maxProfiles = isPro ? 100 : 50;
+
+    const processed = filtered.map((c, index) => {
+      const isLocked = index >= maxProfiles;
+      if (isLocked) {
+        return {
+          ...c,
+          isLocked: true,
+          email: '***@***.***',
+          phone: '+91 **********',
+          resumeUrl: null,
+          hasResume: false
+        };
+      }
+      return {
+        ...c,
+        isLocked: false
+      };
+    });
+
+    return res.status(200).json(processed);
   } catch (error) {
     console.error('Error fetching candidates:', error);
     return res.status(500).json({ message: 'Error fetching candidates' });
@@ -1837,6 +1888,156 @@ export const deleteRecruiterCandidate = async (req: any, res: Response) => {
   } catch (error: any) {
     console.error('Error deleting recruiter candidate:', error);
     return res.status(500).json({ message: 'Error removing candidate', error: error?.message });
+  }
+};
+
+// ==========================================
+// RECRUITER SUBSCRIPTION & PLAN CONTROLLER
+// FREE VERSION: 10 jobs/mo, 50 profiles, basic applicant management
+// PRO VERSION: 50 jobs/mo, 100 profiles, applicant management with ATS
+// ==========================================
+
+export const getRecruiterSubscription = async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const profile = await getOrEnsureRecruiterProfile(userId);
+    if (!profile) return res.status(404).json({ message: 'Recruiter profile not found' });
+    const plan = (profile.plan || 'FREE').toUpperCase();
+    const isPro = plan === 'PRO';
+
+    // Count monthly jobs posted by this recruiter (current month)
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const monthlyJobsPosted = await prisma.job.count({
+      where: {
+        recruiterId: profile.id,
+        createdAt: { gte: startOfMonth, lte: endOfMonth }
+      }
+    });
+
+    const totalActiveJobs = await prisma.job.count({
+      where: {
+        recruiterId: profile.id,
+        status: 'PUBLISHED'
+      }
+    });
+
+    const maxJobs = isPro ? 50 : 10;
+    const maxProfiles = isPro ? 100 : 50;
+    const viewedProfilesCount = profile.viewedProfilesCount || 0;
+
+    return res.status(200).json({
+      plan,
+      isPro,
+      planActivatedAt: profile.planActivatedAt || new Date(),
+      limits: {
+        jobsMonthly: maxJobs,
+        candidateProfiles: maxProfiles,
+        applicantManagementAts: isPro
+      },
+      usage: {
+        monthlyJobsPosted,
+        totalActiveJobs,
+        viewedProfilesCount,
+        jobsRemaining: Math.max(0, maxJobs - monthlyJobsPosted),
+        profilesRemaining: Math.max(0, maxProfiles - viewedProfilesCount)
+      },
+      features: {
+        jobPostingText: isPro ? 'Up to 50 jobs monthly' : '10 limited jobs monthly posting',
+        candidateProfilesText: isPro ? 'View up to 100 candidate profiles' : 'Only view 50 candidate profiles',
+        atsText: isPro ? 'Applicant management with ATS (Full Score & Filters)' : 'Applicant management (Basic - ATS Locked)'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching recruiter subscription:', error);
+    return res.status(500).json({ message: 'Error retrieving subscription' });
+  }
+};
+
+export const activateRecruiterSubscription = async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const targetPlan = (req.body?.plan || 'PRO').toUpperCase();
+    if (targetPlan !== 'FREE' && targetPlan !== 'PRO') {
+      return res.status(400).json({ message: 'Invalid plan. Choose FREE or PRO.' });
+    }
+
+    const profile = await getOrEnsureRecruiterProfile(userId);
+    if (!profile) return res.status(404).json({ message: 'Recruiter profile not found' });
+    const updated = await prisma.recruiterProfile.update({
+      where: { id: profile.id },
+      data: {
+        plan: targetPlan,
+        planActivatedAt: new Date()
+      }
+    });
+
+    const isPro = targetPlan === 'PRO';
+    return res.status(200).json({
+      success: true,
+      message: isPro 
+        ? '🎉 Congratulations! PRO Version Activated. You can now post 50 jobs monthly, view 100 candidate profiles, and use ATS Applicant Management!'
+        : 'Plan set to FREE Version. Limits applied: 10 jobs/month, 50 candidate profiles.',
+      plan: targetPlan,
+      isPro,
+      limits: {
+        jobsMonthly: isPro ? 50 : 10,
+        candidateProfiles: isPro ? 100 : 50,
+        applicantManagementAts: isPro
+      }
+    });
+  } catch (error) {
+    console.error('Error activating subscription:', error);
+    return res.status(500).json({ message: 'Error activating subscription plan' });
+  }
+};
+
+export const trackCandidateProfileView = async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const profile = await getOrEnsureRecruiterProfile(userId);
+    if (!profile) return res.status(404).json({ message: 'Recruiter profile not found' });
+    const plan = (profile.plan || 'FREE').toUpperCase();
+    const isPro = plan === 'PRO';
+    const limit = isPro ? 100 : 50;
+
+    const currentCount = profile.viewedProfilesCount || 0;
+    if (currentCount >= limit) {
+      return res.status(403).json({
+        allowed: false,
+        limitReached: true,
+        message: isPro 
+          ? 'Pro plan limit reached (100 candidate profiles viewed).'
+          : 'Free plan limit reached (50 candidate profiles viewed). Upgrade to Pro Plan to view up to 100 candidate profiles!',
+        currentCount,
+        limit,
+        plan
+      });
+    }
+
+    const updated = await prisma.recruiterProfile.update({
+      where: { id: profile.id },
+      data: { viewedProfilesCount: currentCount + 1 }
+    });
+
+    return res.status(200).json({
+      allowed: true,
+      currentCount: updated.viewedProfilesCount,
+      limit,
+      remaining: Math.max(0, limit - updated.viewedProfilesCount),
+      plan
+    });
+  } catch (error) {
+    console.error('Error tracking candidate profile view:', error);
+    return res.status(500).json({ message: 'Error tracking view' });
   }
 };
 

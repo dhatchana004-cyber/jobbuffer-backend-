@@ -26,6 +26,7 @@ const saveAlerts = (alerts: any[]) => {
 
 import multer from 'multer';
 import { getCandidateExtendedDetails } from '../utils/candidateProfileStore';
+import { getParsedResumeForCandidate, parseResumeText, extractTextFromResumeBuffer } from '../utils/resumeParser';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -90,16 +91,45 @@ router.get('/profile', async (req: Request, res: Response) => {
     const hasResume = !!(candidateProfile?.resumes && candidateProfile.resumes.length > 0);
     const primaryResume = hasResume ? candidateProfile.resumes[0] : null;
     const cleanResumeName = primaryResume?.fileName ? decodeURIComponent(primaryResume.fileName) : null;
-    const skillNames = candidateProfile.skills ? candidateProfile.skills.map((s: any) => s.name) : [];
+    let skillNames = candidateProfile.skills ? candidateProfile.skills.map((s: any) => s.name) : [];
+
+    // Dynamically parse candidate resume from uploads directory if available
+    const uploadsDir = path.join(__dirname, '../../uploads');
+    let parsedResume: any = null;
+    if (hasResume) {
+      parsedResume = await getParsedResumeForCandidate(uploadsDir, user.id, primaryResume?.fileUrl || primaryResume?.fileName);
+    }
+
+    const extDetails = getCandidateExtendedDetails(user, skillNames, candidateProfile.noticePeriod);
+
+    // Prefer real extracted resume data over any static defaults
+    const effectiveSkills = (parsedResume?.skills && parsedResume.skills.length > 0)
+      ? parsedResume.skills
+      : (skillNames.length > 0 ? skillNames : []);
+
+    const effectiveExperience = parsedResume?.experience
+      || (extDetails.experienceList?.[0] ? `${extDetails.experienceList[0].role} (${extDetails.experienceList[0].duration})` : ((candidateProfile as any).experience || ''));
+
+    const effectiveEducation = (parsedResume?.education && parsedResume.education.length > 0)
+      ? parsedResume.education
+      : (extDetails.education || []);
+
+    const effectiveExperienceList = (parsedResume?.experienceList && parsedResume.experienceList.length > 0)
+      ? parsedResume.experienceList
+      : (extDetails.experienceList || []);
+
+    const effectiveHeadline = parsedResume?.headline || extDetails.headline || (effectiveSkills.length > 0 ? `${effectiveSkills[0]} Full Stack Developer` : '');
+    const effectiveBio = parsedResume?.bio || extDetails.bio || '';
+    const effectiveProjects = (parsedResume?.projects && parsedResume.projects.length > 0)
+      ? parsedResume.projects
+      : (extDetails.projects || []);
 
     let strength = 20;
     if (user.name) strength += 15;
     if (user.phone) strength += 15;
     if (candidateProfile.location) strength += 15;
-    if (skillNames.length > 0) strength += 15;
+    if (effectiveSkills.length > 0) strength += 15;
     if (hasResume) strength += 20;
-
-    const extDetails = getCandidateExtendedDetails(user, skillNames, candidateProfile.noticePeriod);
 
     const profileData = {
       id: user.id,
@@ -111,16 +141,16 @@ router.get('/profile', async (req: Request, res: Response) => {
       workMode: candidateProfile.workMode || '',
       noticePeriod: candidateProfile.noticePeriod || '',
       expectedSalary: candidateProfile.expectedSalary || '',
-      skills: skillNames,
-      experience: extDetails.experienceList?.[0] ? `${extDetails.experienceList[0].role} (${extDetails.experienceList[0].duration})` : ((candidateProfile as any).experience || ''),
-      bio: extDetails.bio || '',
-      education: extDetails.education || [],
-      experienceList: extDetails.experienceList || [],
+      skills: effectiveSkills,
+      experience: effectiveExperience,
+      bio: effectiveBio,
+      education: effectiveEducation,
+      experienceList: effectiveExperienceList,
       certifications: extDetails.certifications || [],
-      projects: extDetails.projects || [],
+      projects: effectiveProjects,
       languages: extDetails.languages || ['English', 'Tamil'],
       links: extDetails.links || {},
-      headline: extDetails.headline || (skillNames.length > 0 ? `${skillNames[0]} Engineer` : ''),
+      headline: effectiveHeadline,
       resume: primaryResume?.fileUrl || null,
       resumeName: cleanResumeName,
       profileCompletion: strength
@@ -247,6 +277,7 @@ router.put('/profile', upload.any(), async (req: Request, res: Response) => {
     // Check if resume file was uploaded in request
     const uploadedFile = (req.files as any[])?.[0];
     let createdResume = null;
+    let parsedResumeData: any = null;
     if (uploadedFile && uploadedFile.buffer) {
       const cleanOriginalName = decodeURIComponent(uploadedFile.originalname || 'Resume.pdf').replace(/%20/g, ' ');
       const uploadsDir = path.join(__dirname, '../../uploads');
@@ -268,6 +299,30 @@ router.put('/profile', upload.any(), async (req: Request, res: Response) => {
           isPrimary: true
         }
       });
+
+      // Extract text and parse resume immediately
+      try {
+        const rawText = await extractTextFromResumeBuffer(uploadedFile.buffer, cleanOriginalName);
+        parsedResumeData = parseResumeText(rawText, user.name);
+        if (parsedResumeData?.skills && parsedResumeData.skills.length > 0) {
+          rawSkillsList = Array.from(new Set([...rawSkillsList, ...parsedResumeData.skills]));
+          for (const sName of parsedResumeData.skills) {
+            try {
+              const skill = await prisma.skill.upsert({
+                where: { name: sName },
+                update: {},
+                create: { name: sName }
+              });
+              await prisma.candidateProfile.update({
+                where: { id: candidateProfile.id },
+                data: { skills: { connect: { id: skill.id } } }
+              });
+            } catch (e) {}
+          }
+        }
+      } catch (parseErr) {
+        console.warn('Error parsing uploaded resume in PUT /profile:', parseErr);
+      }
     }
 
     const latestResume = createdResume || candidateProfile.resumes?.[0] || null;
@@ -283,6 +338,11 @@ router.put('/profile', upload.any(), async (req: Request, res: Response) => {
         noticePeriod: candidateProfile.noticePeriod || '',
         expectedSalary: candidateProfile.expectedSalary || '',
         skills: rawSkillsList.length > 0 ? rawSkillsList : candidateProfile.skills.map((s: any) => s.name),
+        experience: parsedResumeData?.experience || (candidateProfile as any).experience,
+        education: parsedResumeData?.education,
+        experienceList: parsedResumeData?.experienceList,
+        headline: parsedResumeData?.headline,
+        bio: parsedResumeData?.bio,
         resume: latestResume?.fileUrl || null,
         resumeName: latestResume?.fileName ? decodeURIComponent(latestResume.fileName) : null
       }

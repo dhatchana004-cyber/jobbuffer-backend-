@@ -31,13 +31,21 @@ import {
   testSendRecruiterEmailTemplate,
   getRecruiterEmailDeliveryLogs,
   deleteRecruiterApplication,
-  deleteRecruiterCandidate
+  deleteRecruiterCandidate,
+  getRecruiterSubscription,
+  activateRecruiterSubscription,
+  trackCandidateProfileView
 } from '../controllers/recruiterController';
 import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/dashboard', authenticate, authorize('RECRUITER'), getRecruiterDashboardStats);
+
+// Subscription & Plan Management (FREE vs PRO)
+router.get('/subscription', authenticate, authorize('RECRUITER'), getRecruiterSubscription);
+router.post('/subscription/activate', authenticate, authorize('RECRUITER'), activateRecruiterSubscription);
+router.post('/subscription/view-candidate', authenticate, authorize('RECRUITER'), trackCandidateProfileView);
 router.get('/jobs', authenticate, authorize('RECRUITER'), getJobs);
 router.post('/jobs', authenticate, authorize('RECRUITER'), createJob);
 router.patch('/jobs/:id/status', authenticate, authorize('RECRUITER'), updateJobStatus);

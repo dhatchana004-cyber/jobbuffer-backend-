@@ -10,9 +10,12 @@ import recruiterRoutes from './routes/recruiterRoutes';
 import adminRoutes from './routes/adminRoutes';
 import jobRoutes from './routes/jobRoutes';
 import applicationRoutes from './routes/applicationRoutes';
+import aiRoutes from './routes/aiRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
 import path from 'path';
+import dotenv from 'dotenv';
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
 
@@ -53,27 +56,23 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // Health Check
-app.get('/health', (req: Request, res: Response) => {
+app.get(['/health', '/api/health', '/api/v1/health'], (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Dedicated Resume Preview & Download Handler
-app.get([
-  '/api/resumes/:filename', 
-  '/api/v1/api/resumes/:filename',
-  '/api/v1/resumes/:filename',
-  '/api/recruiter/resumes/:filename',
-  '/api/v1/recruiter/resumes/:filename',
-  '/api/candidates/resume/:filename',
-  '/api/v1/candidates/resume/:filename'
-], async (req: Request, res: Response) => {
+// Dedicated Resume Preview & Download Handler Function
+const serveResumeDocument = async (req: Request, res: Response) => {
   try {
-    const rawParam = req.params.filename;
+    console.log('serveResumeDocument called with:', req.originalUrl, req.path, req.params);
+    const rawParam = req.params?.filename || req.params?.[0] || req.path.replace(/^\//, '').split('/').pop();
     const rawFilename = Array.isArray(rawParam) ? rawParam[0] : (rawParam || '');
     const download = req.query.download === 'true';
 
-    // Decode URL components
-    const filename = decodeURIComponent(String(rawFilename));
+    // Decode URL components and strip directory traversal
+    let filename = decodeURIComponent(String(rawFilename)).replace(/^.*[\\\/]/, '');
+    if (!filename || filename === 'uploads' || filename === 'resumes') {
+      filename = 'Resume.pdf';
+    }
     const directPath = path.join(uploadsDir, filename);
 
     // Determine target file to send
@@ -82,11 +81,11 @@ app.get([
       targetPath = directPath;
     } else {
       // Case-insensitive or partial name fallback
-      const availableFiles = fs.readdirSync(uploadsDir);
+      const availableFiles = fs.readdirSync(uploadsDir).filter(f => !fs.statSync(path.join(uploadsDir, f)).isDirectory());
       const cleanTarget = filename.toLowerCase().replace(/(_resume)?\.(pdf|docx?)$/i, '');
       const matched = availableFiles.find(
         f => f.toLowerCase() === filename.toLowerCase() ||
-             f.toLowerCase().includes(cleanTarget) ||
+             (cleanTarget.length >= 3 && f.toLowerCase().includes(cleanTarget)) ||
              (cleanTarget.length >= 4 && cleanTarget.includes(f.toLowerCase().replace(/(_resume)?\.(pdf|docx?)$/i, '')))
       );
 
@@ -152,7 +151,34 @@ app.get([
     console.error('Error serving resume:', err);
     return res.status(500).json({ message: 'Error retrieving resume' });
   }
+};
+
+// Route mappings for resume viewing & downloading
+const resumeRoutes = [
+  '/uploads/:filename',
+  '/api/uploads/:filename',
+  '/api/v1/uploads/:filename',
+  '/resumes/:filename',
+  '/api/resumes/:filename', 
+  '/api/v1/api/resumes/:filename',
+  '/api/v1/resumes/:filename',
+  '/api/admin/resumes/:filename',
+  '/api/v1/admin/resumes/:filename',
+  '/api/recruiter/resumes/:filename',
+  '/api/v1/recruiter/resumes/:filename',
+  '/api/candidates/resume/:filename',
+  '/api/v1/candidates/resume/:filename'
+];
+
+resumeRoutes.forEach(r => {
+  app.get(r, serveResumeDocument);
 });
+
+// Fallback for any other /uploads/* or /resumes/* requests
+app.use('/uploads', serveResumeDocument);
+app.use('/api/uploads', serveResumeDocument);
+app.use('/resumes', serveResumeDocument);
+app.use('/api/resumes', serveResumeDocument);
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
@@ -173,6 +199,8 @@ app.use('/api/v1/applications', applicationRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/v1/notifications', candidateRoutes);
 app.use('/api/notifications', candidateRoutes);
+app.use('/api/v1/ai', aiRoutes);
+app.use('/api/ai', aiRoutes);
 
 
 // 404 Handler
