@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-ssr
+*.log
+uploads/*
+!uploads/.gitkeep
+.candidate-profiles.json
+.deleted-users-cache.json
+.payment-history.json
+.payment-orders.json
+.subscription-payments.json

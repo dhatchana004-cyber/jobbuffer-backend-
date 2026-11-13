@@ -34,7 +34,9 @@ import {
   deleteRecruiterCandidate,
   getRecruiterSubscription,
   activateRecruiterSubscription,
-  trackCandidateProfileView
+  trackCandidateProfileView,
+  getPublicSubscriptionPlanConfig,
+  getRecruiterSubscriptionPayments
 } from '../controllers/recruiterController';
 import { authenticate, authorize } from '../middleware/auth';
 
@@ -43,7 +45,9 @@ const router = Router();
 router.get('/dashboard', authenticate, authorize('RECRUITER'), getRecruiterDashboardStats);
 
 // Subscription & Plan Management (FREE vs PRO)
+router.get('/subscription-plan', getPublicSubscriptionPlanConfig);
 router.get('/subscription', authenticate, authorize('RECRUITER'), getRecruiterSubscription);
+router.get('/subscription/payments', authenticate, authorize('RECRUITER'), getRecruiterSubscriptionPayments);
 router.post('/subscription/activate', authenticate, authorize('RECRUITER'), activateRecruiterSubscription);
 router.post('/subscription/view-candidate', authenticate, authorize('RECRUITER'), trackCandidateProfileView);
 router.get('/jobs', authenticate, authorize('RECRUITER'), getJobs);

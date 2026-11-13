@@ -14,6 +14,12 @@ import { templateService } from '../services/templateService';
 import { calculateAtsScore } from '../utils/atsCalculator';
 import { resolveCandidateName } from '../utils/candidateNameHelper';
 import { getCandidateExtendedDetails } from '../utils/candidateProfileStore';
+import {
+  getSubscriptionConfig,
+  recordSubscriptionPayment,
+  getSubscriptionPayments,
+  getRecruiterPricingPlans
+} from '../services/subscriptionConfigService';
 
 const DISMISSED_CANDIDATES_FILE = path.join(process.cwd(), '.dismissed-candidates.json');
 
@@ -38,17 +44,19 @@ export async function getOrEnsureRecruiterProfile(userId: string) {
     include: { company: true, user: true }
   });
   if (!profile) {
-    let company = await prisma.company.findFirst({
-      where: { name: 'JoBuffer' }
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const companyName = user?.name ? `${user.name}'s Company` : 'Recruiting Company';
+    let company = await prisma.company.create({
+      data: {
+        name: companyName,
+        headquarters: 'Remote'
+      }
     });
-    if (!company) {
-      company = await prisma.company.findFirst();
-    }
     try {
       profile = await prisma.recruiterProfile.create({
         data: {
           userId,
-          companyId: company?.id,
+          companyId: company.id,
           designation: 'Recruitment Specialist'
         },
         include: { company: true, user: true }
@@ -69,32 +77,16 @@ export const getJobs = async (req: any, res: Response) => {
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
     const profile = await getOrEnsureRecruiterProfile(userId);
+    if (!profile) return res.status(200).json([]);
 
-    const whereJob = (req.user?.role === 'ADMIN' || !profile)
-      ? {}
-      : {
-          OR: [
-            { recruiterId: profile.id },
-            ...(profile.companyId ? [{ companyId: profile.companyId }] : [])
-          ]
-        };
-
-    let jobs = await prisma.job.findMany({
-      where: whereJob,
+    // Multi-tenant isolation: Strictly fetch jobs created by this specific recruiter
+    const jobs = await prisma.job.findMany({
+      where: { recruiterId: profile.id },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: { select: { applications: true } }
       }
     });
-
-    if (jobs.length === 0) {
-      jobs = await prisma.job.findMany({
-        orderBy: { createdAt: 'desc' },
-        include: {
-          _count: { select: { applications: true } }
-        }
-      });
-    }
 
     const formatted = jobs.map(j => ({
       id: j.id,
@@ -350,17 +342,14 @@ export const getApplications = async (req: any, res: Response) => {
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
     const profile = await getOrEnsureRecruiterProfile(userId);
+    if (!profile) return res.status(200).json([]);
 
-    const whereClause = (req.user?.role === 'ADMIN' || !profile)
-      ? {}
-      : {
-          job: {
-            OR: [
-              { recruiterId: profile.id },
-              ...(profile.companyId ? [{ companyId: profile.companyId }] : [])
-            ]
-          }
-        };
+    // Multi-tenant isolation: Strictly fetch applications for jobs posted by this specific recruiter
+    const whereClause = {
+      job: {
+        recruiterId: profile.id
+      }
+    };
 
     const includeBlock = {
       candidate: {
@@ -394,18 +383,11 @@ export const getApplications = async (req: any, res: Response) => {
       }
     };
 
-    let applications = await prisma.application.findMany({
+    const applications = await prisma.application.findMany({
       where: whereClause,
       include: includeBlock,
       orderBy: { createdAt: 'desc' }
     });
-
-    if (applications.length === 0) {
-      applications = await prisma.application.findMany({
-        include: includeBlock,
-        orderBy: { createdAt: 'desc' }
-      });
-    }
 
     const formatted = applications.map(a => {
       const candSkills = a.candidate.skills && a.candidate.skills.length > 0 
@@ -778,12 +760,7 @@ export const getCandidates = async (req: any, res: Response) => {
 
     const recruiterJobCondition = (req.user?.role === 'ADMIN' || !profile)
       ? {}
-      : {
-          OR: [
-            { recruiterId: profile.id },
-            ...(profile.companyId ? [{ companyId: profile.companyId }] : [])
-          ]
-        };
+      : { recruiterId: profile.id };
 
     // Auto-create CandidateProfile for any registered CANDIDATE user who doesn't have one
     const candUsersWithoutProfile = await prisma.user.findMany({
@@ -804,8 +781,20 @@ export const getCandidates = async (req: any, res: Response) => {
       }).catch(() => {});
     }
 
-    // Fetch ALL registered candidates on the platform for Talent Discovery
+    // Recruiter only sees candidates who applied to their own posted jobs (Admin sees all)
+    const candidateWhereClause: any = {};
+    if (req.user?.role !== 'ADMIN' && profile) {
+      candidateWhereClause.applications = {
+        some: {
+          job: {
+            recruiterId: profile.id
+          }
+        }
+      };
+    }
+
     const candidateProfiles = await prisma.candidateProfile.findMany({
+      where: candidateWhereClause,
       include: {
         user: {
           select: {
@@ -906,7 +895,7 @@ export const getCandidates = async (req: any, res: Response) => {
     });
 
     const dismissed = loadDismissedCandidates();
-    const companyKey = profile?.companyId || profile?.id || 'admin';
+    const companyKey = profile?.id || 'admin';
     const companyDismissed = dismissed[companyKey] || [];
 
     let filtered = formatted.filter(c => !companyDismissed.includes(c.id) && !companyDismissed.includes(c.userId));
@@ -968,6 +957,14 @@ export const inviteCandidate = async (req: any, res: Response) => {
     const { candidateProfileId, jobId, status } = req.body;
     if (!candidateProfileId || !jobId) {
       return res.status(400).json({ message: 'Candidate and Job are required' });
+    }
+
+    if (req.user?.role !== 'ADMIN') {
+      const profile = await getOrEnsureRecruiterProfile(req.user?.id);
+      const job = await prisma.job.findUnique({ where: { id: jobId } });
+      if (!job || !profile || job.recruiterId !== profile.id) {
+        return res.status(403).json({ message: 'Forbidden: You can only invite candidates to your own jobs' });
+      }
     }
 
     const targetStatus = status || 'SHORTLISTED';
@@ -1805,8 +1802,7 @@ export const deleteRecruiterApplication = async (req: any, res: Response) => {
       return res.status(404).json({ message: 'Application not found' });
     }
 
-    const belongsToRecruiter = app.job.recruiterId === profile.id || 
-      (profile.companyId && app.job.companyId === profile.companyId);
+    const belongsToRecruiter = app.job.recruiterId === profile.id || req.user?.role === 'ADMIN';
 
     if (!belongsToRecruiter) {
       return res.status(403).json({ message: 'Not authorized to delete this application' });
@@ -1836,15 +1832,12 @@ export const deleteRecruiterCandidate = async (req: any, res: Response) => {
     const profile = await prisma.recruiterProfile.findUnique({ where: { userId } });
     if (!profile) return res.status(403).json({ message: 'Recruiter profile not found' });
 
-    const companyKey = profile.companyId || profile.id;
+    const companyKey = profile.id;
 
-    // 1. Delete any applications for this candidate under this company's jobs
+    // 1. Delete any applications for this candidate under this recruiter's jobs
     const jobs = await prisma.job.findMany({
       where: {
-        OR: [
-          { recruiterId: profile.id },
-          ...(profile.companyId ? [{ companyId: profile.companyId }] : [])
-        ]
+        recruiterId: profile.id
       },
       select: { id: true }
     });
@@ -1926,14 +1919,18 @@ export const getRecruiterSubscription = async (req: any, res: Response) => {
       }
     });
 
-    const maxJobs = isPro ? 50 : 10;
-    const maxProfiles = isPro ? 100 : 50;
+    const config = getSubscriptionConfig();
+    const recruiterPlans = getRecruiterPricingPlans(config);
+    const maxJobs = isPro ? (config.monthlyJobLimit || 50) : 10;
+    const maxProfiles = isPro ? (config.candidateProfileLimit || 100) : 50;
     const viewedProfilesCount = profile.viewedProfilesCount || 0;
 
     return res.status(200).json({
       plan,
       isPro,
       planActivatedAt: profile.planActivatedAt || new Date(),
+      pricing: config,
+      recruiterPlans,
       limits: {
         jobsMonthly: maxJobs,
         candidateProfiles: maxProfiles,
@@ -1947,14 +1944,43 @@ export const getRecruiterSubscription = async (req: any, res: Response) => {
         profilesRemaining: Math.max(0, maxProfiles - viewedProfilesCount)
       },
       features: {
-        jobPostingText: isPro ? 'Up to 50 jobs monthly' : '10 limited jobs monthly posting',
-        candidateProfilesText: isPro ? 'View up to 100 candidate profiles' : 'Only view 50 candidate profiles',
+        jobPostingText: isPro ? `Up to ${maxJobs} jobs monthly` : '10 limited jobs monthly posting',
+        candidateProfilesText: isPro ? `View up to ${maxProfiles} candidate profiles` : 'Only view 50 candidate profiles',
         atsText: isPro ? 'Applicant management with ATS (Full Score & Filters)' : 'Applicant management (Basic - ATS Locked)'
       }
     });
   } catch (error) {
     console.error('Error fetching recruiter subscription:', error);
     return res.status(500).json({ message: 'Error retrieving subscription' });
+  }
+};
+
+export const getPublicSubscriptionPlanConfig = async (req: Request, res: Response) => {
+  try {
+    const config = getSubscriptionConfig();
+    const recruiterPlans = getRecruiterPricingPlans(config);
+    return res.status(200).json({
+      ...config,
+      plans: recruiterPlans.plans,
+      recruiterPlans
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error retrieving subscription plan details' });
+  }
+};
+
+export const getRecruiterSubscriptionPayments = async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+    const profile = await getOrEnsureRecruiterProfile(userId);
+    if (!profile) return res.status(404).json({ message: 'Recruiter profile not found' });
+
+    const allPayments = getSubscriptionPayments();
+    const recruiterPayments = allPayments.filter(p => p.recruiterId === profile.id || p.recruiterEmail === profile.user?.email);
+    return res.status(200).json(recruiterPayments);
+  } catch (error) {
+    return res.status(500).json({ message: 'Error retrieving payments' });
   }
 };
 
@@ -1968,6 +1994,10 @@ export const activateRecruiterSubscription = async (req: any, res: Response) => 
       return res.status(400).json({ message: 'Invalid plan. Choose FREE or PRO.' });
     }
 
+    const duration: '1_MONTH' | '3_MONTH' | '6_MONTH' = req.body?.duration || '1_MONTH';
+    const durationDays = duration === '6_MONTH' ? 180 : (duration === '3_MONTH' ? 90 : 30);
+    const durationMonths = duration === '6_MONTH' ? 6 : (duration === '3_MONTH' ? 3 : 1);
+
     const profile = await getOrEnsureRecruiterProfile(userId);
     if (!profile) return res.status(404).json({ message: 'Recruiter profile not found' });
     const updated = await prisma.recruiterProfile.update({
@@ -1979,16 +2009,54 @@ export const activateRecruiterSubscription = async (req: any, res: Response) => 
     });
 
     const isPro = targetPlan === 'PRO';
+    const config = getSubscriptionConfig();
+
+    // Determine plan pricing based on chosen duration
+    let expectedAmount = config.recruiter1MonthPrice;
+    if (duration === '3_MONTH') expectedAmount = config.recruiter3MonthPrice;
+    if (duration === '6_MONTH') expectedAmount = config.recruiter6MonthPrice;
+
+    let paymentRecord = null;
+    if (isPro) {
+      const paymentDetails = req.body?.paymentDetails || {};
+      const paidAmount = Number(paymentDetails.amount) || expectedAmount;
+      const paymentMethod = String(paymentDetails.paymentMethod || 'UPI').toUpperCase();
+      const transactionId = paymentDetails.transactionId || `TXN_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+
+      paymentRecord = recordSubscriptionPayment({
+        recruiterId: profile.id,
+        recruiterName: profile.user?.name || 'Recruiter',
+        recruiterEmail: profile.user?.email || '',
+        companyName: profile.company?.name || 'Recruiter Company',
+        plan: 'PRO',
+        duration,
+        durationMonths,
+        amount: paidAmount,
+        currency: config.currency,
+        paymentMethod,
+        transactionId,
+        upiReference: paymentDetails.upiReference || undefined,
+        status: 'COMPLETED'
+      });
+
+      console.log(`[SUBSCRIPTION PAYMENT] PRO Plan (${duration}) activated for ${profile.user?.email} with payment of ₹${paidAmount} via ${paymentMethod} (${transactionId})`);
+    }
+
+    const durationLabel = duration === '6_MONTH' ? '6 Months' : (duration === '3_MONTH' ? '3 Months' : '1 Month');
+
     return res.status(200).json({
       success: true,
       message: isPro 
-        ? '🎉 Congratulations! PRO Version Activated. You can now post 50 jobs monthly, view 100 candidate profiles, and use ATS Applicant Management!'
+        ? `🎉 Congratulations! PRO Version (${durationLabel}) Activated. Payment of ₹${paymentRecord?.amount || expectedAmount} verified. You can now post 50 jobs monthly, view 100 candidate profiles, and use ATS Applicant Management!`
         : 'Plan set to FREE Version. Limits applied: 10 jobs/month, 50 candidate profiles.',
       plan: targetPlan,
       isPro,
+      duration,
+      durationDays,
+      payment: paymentRecord,
       limits: {
-        jobsMonthly: isPro ? 50 : 10,
-        candidateProfiles: isPro ? 100 : 50,
+        jobsMonthly: isPro ? (config.monthlyJobLimit || 50) : 10,
+        candidateProfiles: isPro ? (config.candidateProfileLimit || 100) : 50,
         applicantManagementAts: isPro
       }
     });

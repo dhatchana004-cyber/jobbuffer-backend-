@@ -119,19 +119,13 @@ export const getRecruiterDashboardStats = async (req: any, res: Response) => {
       });
     }
 
-    const whereJob = (req.user?.role === 'ADMIN' || !profile.companyId)
-      ? { OR: [{ recruiterId: profile.id }, ...(profile.companyId ? [{ companyId: profile.companyId }] : [])] }
-      : { OR: [{ recruiterId: profile.id }, { companyId: profile.companyId }] };
+    // Multi-tenant isolation: Strictly isolate recruiter's jobs and applications
+    const whereJob = { recruiterId: profile.id };
 
-    let activeJobs = await prisma.job.count({ where: { ...whereJob, status: 'PUBLISHED' } });
-    let totalApplications = await prisma.application.count({
+    const activeJobs = await prisma.job.count({ where: { ...whereJob, status: 'PUBLISHED' } });
+    const totalApplications = await prisma.application.count({
       where: { job: whereJob }
     });
-
-    if (activeJobs === 0 && totalApplications === 0) {
-      activeJobs = await prisma.job.count({ where: { status: 'PUBLISHED' } });
-      totalApplications = await prisma.application.count();
-    }
     const pendingReview = await prisma.application.count({
       where: { job: whereJob, status: 'APPLIED' }
     });

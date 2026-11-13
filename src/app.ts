@@ -11,6 +11,7 @@ import adminRoutes from './routes/adminRoutes';
 import jobRoutes from './routes/jobRoutes';
 import applicationRoutes from './routes/applicationRoutes';
 import aiRoutes from './routes/aiRoutes';
+import paymentRoutes from './routes/paymentRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
 import path from 'path';
@@ -25,12 +26,43 @@ const app = express();
 
 app.set('trust proxy', 1);
 
+// Comprehensive CORS & Preflight Middleware (Live Production & Local Dev)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = (req.headers.origin as string) || '*';
+
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, X-Access-Token'
+  );
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length, X-Total-Count');
+
+  // Answer preflight OPTIONS requests immediately
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'Cache-Control', 'Pragma', 'X-Access-Token']
+}));
+
+// Preflight handler for all routes
+app.options('*', (req: Request, res: Response) => {
+  res.status(200).end();
+});
+
 // Security Middleware - allow cross-origin resource access for PDF previews & downloads
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginEmbedderPolicy: false,
 }));
-app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -201,6 +233,8 @@ app.use('/api/v1/notifications', candidateRoutes);
 app.use('/api/notifications', candidateRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/payments', paymentRoutes);
 
 
 // 404 Handler

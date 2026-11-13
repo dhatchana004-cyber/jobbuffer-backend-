@@ -1,5 +1,16 @@
 import fs from 'fs';
 import path from 'path';
+import { 
+  ALL_INDIAN_TECH_JOBS_SEED, 
+  getCompanyLogo, 
+  getVerifiedCareerUrl, 
+  COMPANY_LOGO_MAP, 
+  OFFICIAL_COMPANY_CAREER_URLS, 
+  isDummyUrl, 
+  SeedJobDef 
+} from './indiaJobsData';
+
+export { getCompanyLogo, getVerifiedCareerUrl, COMPANY_LOGO_MAP, OFFICIAL_COMPANY_CAREER_URLS, isDummyUrl };
 
 export interface JobvettaRawJob {
   job_id?: string;
@@ -37,6 +48,7 @@ export interface UnifiedJob {
   location?: string | null;
   openings?: number;
   status: 'PUBLISHED';
+  logo?: string | null;
   company: {
     id: string;
     name: string;
@@ -90,281 +102,7 @@ const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // Automatic check every 10 mins
 const MAX_FRESHNESS_DAYS = 30; // Drop jobs older than 30 days
 const DAILY_QUOTA_LIMIT = 50; // Jobvetta free-tier rate limit
 
-// Verified Official Company Career Portals across India
-export const OFFICIAL_COMPANY_CAREER_URLS: Record<string, string> = {
-  zoho: 'https://www.zoho.com/careers/',
-  swiggy: 'https://careers.swiggy.com/',
-  razorpay: 'https://razorpay.com/jobs/',
-  freshworks: 'https://www.freshworks.com/company/careers/',
-  tcs: 'https://www.tcs.com/careers/india',
-  'tata consultancy': 'https://www.tcs.com/careers/india',
-  flipkart: 'https://www.flipkartcareers.com/',
-  cred: 'https://careers.cred.club/',
-  zomato: 'https://www.zomato.com/careers',
-  infosys: 'https://www.infosys.com/careers.html',
-  phonepe: 'https://www.phonepe.com/careers/',
-  paytm: 'https://careers.paytm.com/',
-  jio: 'https://careers.jio.com/',
-  'reliance jio': 'https://careers.jio.com/',
-  wipro: 'https://careers.wipro.com/',
-  cognizant: 'https://careers.cognizant.com/global/en',
-  hcl: 'https://www.hcltech.com/careers',
-  hcltech: 'https://www.hcltech.com/careers',
-  amazon: 'https://www.amazon.jobs/en/locations/bangalore-india',
-  microsoft: 'https://careers.microsoft.com/us/en/search-results?q=India',
-  google: 'https://www.google.com/about/careers/applications/jobs/results/?location=India',
-  'tech mahindra': 'https://careers.techmahindra.com/',
-  'tamil tech': 'https://careers.cognizant.com/global/en'
-};
-
-/**
- * Check if a URL has known dummy/mock patterns that return 404
- */
-export function isDummyUrl(url?: string): boolean {
-  if (!url || typeof url !== 'string' || !url.trim()) return true;
-  const dummySubstrings = [
-    'role=python-engineer',
-    'id=react-fullstack',
-    'data-engineer-platform',
-    'devops-engineer',
-    'java-architect',
-    'applied-ml-engineer',
-    'ios-developer',
-    'frontend-engineer',
-    'security-analyst',
-    'qa-automation-lead',
-    'example.com',
-    'dummy',
-    'placeholder'
-  ];
-  return dummySubstrings.some(sub => url.toLowerCase().includes(sub));
-}
-
-/**
- * Resolve verified official company career page URL to prevent 404 / Page Not Found errors
- */
-export function getVerifiedCareerUrl(companyName?: string, rawUrl?: string): string {
-  const norm = (companyName || '').toLowerCase().trim();
-
-  // 1. Look up official employer career page
-  for (const [key, officialUrl] of Object.entries(OFFICIAL_COMPANY_CAREER_URLS)) {
-    if (norm.includes(key) || key.includes(norm)) {
-      if (!rawUrl || isDummyUrl(rawUrl)) {
-        return officialUrl;
-      }
-      return rawUrl;
-    }
-  }
-
-  // 2. If rawUrl is valid and not a dummy path, use it
-  if (rawUrl && !isDummyUrl(rawUrl) && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
-    return rawUrl;
-  }
-
-  // 3. Clean fallback to Google Jobs / Official Career search
-  const cleanCompany = (companyName || 'Technology Company').trim();
-  return `https://www.google.com/search?q=${encodeURIComponent(cleanCompany + ' official careers apply jobs india')}`;
-}
-
-// Curated live Indian tech jobs for demonstration, fallback & high availability with 100% verified URLs
-const INDIAN_TECH_JOBS_SEED: Array<Partial<UnifiedJob> & { companyName: string; locationName: string }> = [
-  {
-    title: 'Senior Python & FastAPI Engineer',
-    companyName: 'Zoho Corporation',
-    locationName: 'Chennai, Tamil Nadu',
-    workMode: 'Onsite',
-    jobType: 'Full-time',
-    description: 'Build enterprise-grade cloud services, high-throughput microservices, and asynchronous event streams in Python, PostgreSQL, and Redis.',
-    requirements: '3-6 years of hands-on experience with Python, FastAPI, relational databases, distributed caching, and Linux system design.',
-    responsibilities: 'Design and deploy robust RESTful APIs, optimize query latency, participate in architecture reviews, and maintain zero-downtime microservices.',
-    salaryMin: 1200000,
-    salaryMax: 2200000,
-    externalUrl: 'https://www.zoho.com/careers/',
-    daysAgo: 1
-  },
-  {
-    title: 'Full Stack React & Node.js Developer',
-    companyName: 'Swiggy',
-    locationName: 'Bengaluru, Karnataka',
-    workMode: 'Hybrid',
-    jobType: 'Full-time',
-    description: 'Work on consumer-facing delivery and checkout experiences handling millions of real-time transactions daily.',
-    requirements: 'React 18+, TypeScript, Node.js, Next.js, Redis, and high-scale front-end performance tuning.',
-    responsibilities: 'Build responsive, accessible candidate and merchant interfaces, reduce bundle sizes, and integrate real-time tracking web sockets.',
-    salaryMin: 1600000,
-    salaryMax: 2800000,
-    externalUrl: 'https://careers.swiggy.com/',
-    daysAgo: 2
-  },
-  {
-    title: 'Data Engineer / Snowflake Specialist',
-    companyName: 'Razorpay',
-    locationName: 'Bengaluru, Karnataka',
-    workMode: 'Hybrid',
-    jobType: 'Full-time',
-    description: 'Design and manage modern data lake pipelines processing millions of payment ledgers and financial reconciliation events.',
-    requirements: 'SQL, Python, PySpark, Airflow, Snowflake / BigQuery, and Kafka event streaming.',
-    responsibilities: 'Construct automated ETL DAGs, enforce data quality contracts, and deliver real-time analytics to product stakeholders.',
-    salaryMin: 1800000,
-    salaryMax: 3200000,
-    externalUrl: 'https://razorpay.com/jobs/',
-    daysAgo: 3
-  },
-  {
-    title: 'Power BI & Enterprise Analytics Specialist',
-    companyName: 'Reliance Jio',
-    locationName: 'Mumbai, Maharashtra',
-    workMode: 'Hybrid',
-    jobType: 'Full-time',
-    description: 'Architect executive Power BI dashboards, DAX measures, data modeling, and automated KPI pipelines across telecom and digital commerce operations.',
-    requirements: 'Power BI, DAX, Power Query, SQL, Data Warehouse modeling, and Azure Synapse / Databricks integration.',
-    responsibilities: 'Design performant BI reports, optimize DAX calculations, collaborate with business stakeholders, and govern workspace permissions.',
-    salaryMin: 1400000,
-    salaryMax: 2600000,
-    externalUrl: 'https://careers.jio.com/',
-    daysAgo: 1
-  },
-  {
-    title: 'DevOps & Cloud Infrastructure Engineer',
-    companyName: 'Freshworks',
-    locationName: 'Chennai, Tamil Nadu',
-    workMode: 'Hybrid',
-    jobType: 'Full-time',
-    description: 'Empower hundreds of software engineers by building resilient Kubernetes clusters, CI/CD automated gates, and AWS multi-region infrastructure.',
-    requirements: 'AWS, Kubernetes (EKS), Terraform, Docker, Helm, Prometheus, and GitHub Actions.',
-    responsibilities: 'Maintain 99.99% SaaS availability, automate infrastructure as code, and drive cloud cost optimization.',
-    salaryMin: 1400000,
-    salaryMax: 2600000,
-    externalUrl: 'https://www.freshworks.com/company/careers/',
-    daysAgo: 2
-  },
-  {
-    title: 'Java Backend Architect (Spring Boot)',
-    companyName: 'Tata Consultancy Services',
-    locationName: 'Hyderabad, Telangana',
-    workMode: 'Hybrid',
-    jobType: 'Full-time',
-    description: 'Lead banking transformation architecture, modernizing legacy enterprise systems into cloud-native microservices.',
-    requirements: 'Java 17/21, Spring Boot, Microservices, Kafka, PostgreSQL, and secure tokenized authentication.',
-    responsibilities: 'Lead engineering pods, establish design guidelines, and write performant multithreaded core services.',
-    salaryMin: 1300000,
-    salaryMax: 2400000,
-    externalUrl: 'https://www.tcs.com/careers/india',
-    daysAgo: 4
-  },
-  {
-    title: 'Machine Learning & AI Engineer',
-    companyName: 'Flipkart',
-    locationName: 'Bengaluru, Karnataka',
-    workMode: 'Onsite',
-    jobType: 'Full-time',
-    description: 'Build predictive search ranking, customer recommendation algorithms, and automated visual search models.',
-    requirements: 'Python, PyTorch, Scikit-Learn, Vector Databases (Milvus / Pinecone), and LLM fine-tuning.',
-    responsibilities: 'Develop state-of-the-art recommendation systems, perform A/B test iterations, and deploy low-latency inference pipelines.',
-    salaryMin: 2200000,
-    salaryMax: 4000000,
-    externalUrl: 'https://www.flipkartcareers.com/',
-    daysAgo: 1
-  },
-  {
-    title: 'iOS & Mobile Application Developer',
-    companyName: 'CRED',
-    locationName: 'Bengaluru, Karnataka',
-    workMode: 'Onsite',
-    jobType: 'Full-time',
-    description: 'Craft award-winning, fluid user interfaces and micro-animations for high-affluent mobile consumers.',
-    requirements: 'Swift, SwiftUI, Combine, CoreAnimation, and modular mobile architecture.',
-    responsibilities: 'Create pixel-perfect native experiences, optimize app launch time, and engineer rock-solid payment flows.',
-    salaryMin: 2000000,
-    salaryMax: 3500000,
-    externalUrl: 'https://careers.cred.club/',
-    daysAgo: 3
-  },
-  {
-    title: 'Frontend Engineer (Vue / React)',
-    companyName: 'Zomato',
-    locationName: 'Gurugram / Delhi NCR',
-    workMode: 'Hybrid',
-    jobType: 'Full-time',
-    description: 'Build ultra-fast, high-converting interfaces for food discovery, quick-commerce, and live dining experiences.',
-    requirements: 'Modern JavaScript/TypeScript, SSR/SSG architectures, state management, and web vitals optimization.',
-    responsibilities: 'Partner with design teams to ship micro-interactions, monitor crash metrics, and deliver frictionless user journeys.',
-    salaryMin: 1500000,
-    salaryMax: 2700000,
-    externalUrl: 'https://www.zomato.com/careers',
-    daysAgo: 2
-  },
-  {
-    title: 'Cybersecurity Analyst & Threat Hunter',
-    companyName: 'Infosys Limited',
-    locationName: 'Pune, Maharashtra',
-    workMode: 'Hybrid',
-    jobType: 'Full-time',
-    description: 'Guard global enterprise perimeters, analyze zero-day attack vectors, and manage automated incident response playbooks.',
-    requirements: 'SIEM (Splunk/Sentinel), Network Security, Pen Testing, CEH/CISSP certifications, and vulnerability scanning.',
-    responsibilities: 'Perform 24/7 SOC operations, coordinate red-team simulations, and patch mission-critical vulnerabilities.',
-    salaryMin: 1100000,
-    salaryMax: 1900000,
-    externalUrl: 'https://www.infosys.com/careers.html',
-    daysAgo: 5
-  },
-  {
-    title: 'QA Automation Engineer (Playwright / Cypress)',
-    companyName: 'PhonePe',
-    locationName: 'Bengaluru, Karnataka',
-    workMode: 'Hybrid',
-    jobType: 'Full-time',
-    description: 'Build automated end-to-end regression suites ensuring infallible reliability across millions of UPI transactions.',
-    requirements: 'TypeScript/Python, Playwright, Appium, CI/CD pipeline test execution, and API mock testing.',
-    responsibilities: 'Automate critical user journeys, maintain smoke test testbeds, and collaborate with developers on shift-left testing.',
-    salaryMin: 1200000,
-    salaryMax: 2100000,
-    externalUrl: 'https://www.phonepe.com/careers/',
-    daysAgo: 2
-  },
-  {
-    title: 'Cloud Solutions & AWS DevOps Architect',
-    companyName: 'Wipro',
-    locationName: 'Hyderabad, Telangana',
-    workMode: 'Hybrid',
-    jobType: 'Full-time',
-    description: 'Design multi-region cloud architectures, serverless microservices, and disaster recovery architectures for Global 2000 clients.',
-    requirements: 'AWS Solutions Architect, Terraform, Docker, CI/CD, Python/Go, and Kubernetes.',
-    responsibilities: 'Lead cloud migration projects, write infrastructure as code, and implement security compliance policies.',
-    salaryMin: 1500000,
-    salaryMax: 2800000,
-    externalUrl: 'https://careers.wipro.com/',
-    daysAgo: 3
-  },
-  {
-    title: 'Senior React Native Mobile Engineer',
-    companyName: 'Paytm',
-    locationName: 'Noida / Delhi NCR',
-    workMode: 'Onsite',
-    jobType: 'Full-time',
-    description: 'Develop high-scale mobile fintech features, QR merchant scanning, and instantaneous UPI payment processing flows.',
-    requirements: 'React Native, TypeScript, Redux Toolkit, Native iOS/Android bridges, and performance profiling.',
-    responsibilities: 'Build scalable cross-platform components, optimize app bundle size, and reduce cold-start latency.',
-    salaryMin: 1700000,
-    salaryMax: 3000000,
-    externalUrl: 'https://careers.paytm.com/',
-    daysAgo: 2
-  },
-  {
-    title: 'Big Data & Spark Streaming Engineer',
-    companyName: 'Cognizant',
-    locationName: 'Chennai, Tamil Nadu',
-    workMode: 'Hybrid',
-    jobType: 'Full-time',
-    description: 'Build real-time streaming analytics pipelines handling terabytes of operational telemetry and IoT datasets.',
-    requirements: 'Apache Spark, Kafka, Python/Scala, Hadoop, Hive, and AWS EMR / Databricks.',
-    responsibilities: 'Develop fault-tolerant data ingestion jobs, implement schema registry, and ensure data lineage.',
-    salaryMin: 1300000,
-    salaryMax: 2300000,
-    externalUrl: 'https://careers.cognizant.com/global/en',
-    daysAgo: 4
-  }
-];
+// Complete verified Indian tech datasets, career links, and company logos are maintained in ./indiaJobsData.ts
 
 class JobvettaService {
   private cache: Map<string, CacheEntry> = new Map();
@@ -528,10 +266,11 @@ class JobvettaService {
       location,
       openings: 1,
       status: 'PUBLISHED',
+      logo: getCompanyLogo(company, raw.logo || raw.company?.logo),
       company: {
         id: `comp_jv_${company.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
         name: company,
-        logo: null,
+        logo: getCompanyLogo(company, raw.logo || raw.company?.logo),
         headquarters: location
       },
       department: company,
@@ -555,7 +294,7 @@ class JobvettaService {
    * Filter Seed Jobs based on candidate query and location
    */
   private filterSeedJobs(q?: string, location?: string, days?: number, limit?: number): UnifiedJob[] {
-    let list = INDIAN_TECH_JOBS_SEED.map((seed, idx) => this.formatToUnifiedJob(seed, idx));
+    let list = ALL_INDIAN_TECH_JOBS_SEED.map((seed, idx) => this.formatToUnifiedJob(seed, idx));
 
     if (q && q.trim()) {
       const qTokens = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -573,7 +312,7 @@ class JobvettaService {
     const maxDays = Number(days) || 30;
     list = list.filter(j => j.daysAgo <= maxDays);
 
-    const lim = Number(limit) || 20;
+    const lim = Number(limit) || 250;
     return list.slice(0, lim);
   }
 
@@ -590,7 +329,7 @@ class JobvettaService {
   }): Promise<{ jobs: UnifiedJob[]; fromCache: boolean; rateLimitRemaining: number; totalCount: number }> {
     this.updateUtcDay();
 
-    const { q, location, days = 14, limit = 20, forceRefresh = false } = params;
+    const { q, location, days = 30, limit = 250, forceRefresh = false } = params;
     const cacheKey = this.makeCacheKey(q, location, days, limit);
     const now = Date.now();
 
@@ -729,7 +468,7 @@ class JobvettaService {
     }
 
     // 2. Search in deterministic seed jobs
-    const allSeeds = INDIAN_TECH_JOBS_SEED.map((s, idx) => this.formatToUnifiedJob(s, idx));
+    const allSeeds = ALL_INDIAN_TECH_JOBS_SEED.map((s, idx) => this.formatToUnifiedJob(s, idx));
     const seedFound = allSeeds.find(j => 
       j.id === cleanId || 
       j.id === jobId || 

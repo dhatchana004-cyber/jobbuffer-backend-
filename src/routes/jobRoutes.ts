@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { prisma } from '../server';
 import { sendApplicationReceivedEmail } from '../services/emailService';
-import { jobvettaService, getVerifiedCareerUrl } from '../services/jobvettaService';
+import { jobvettaService, getVerifiedCareerUrl, getCompanyLogo } from '../services/jobvettaService';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import fs from 'fs';
+import { isCandidatePro } from '../utils/candidateProfileStore';
 
 const router = Router();
 
@@ -20,8 +21,8 @@ router.get('/', async (req, res) => {
       search, 
       location, 
       source = 'ALL', 
-      days = 14, 
-      limit = 30,
+      days = 30, 
+      limit = 250,
       refresh,
       urgent
     } = req.query;
@@ -65,14 +66,22 @@ router.get('/', async (req, res) => {
         orderBy: { createdAt: 'desc' }
       });
 
-      internalJobs = dbJobs.map((j) => ({
-        ...j,
-        isUrgent: Boolean((j as any).isUrgent),
-        isExternal: false,
-        source: 'JOBBUFFER',
-        externalUrl: null,
-        applyUrl: `/api/jobs/${j.id}/apply`
-      }));
+      internalJobs = dbJobs.map((j) => {
+        const resolvedLogo = getCompanyLogo(j.company?.name || (j as any).department, j.company?.logo);
+        return {
+          ...j,
+          logo: resolvedLogo,
+          company: {
+            ...j.company,
+            logo: resolvedLogo
+          },
+          isUrgent: Boolean((j as any).isUrgent),
+          isExternal: false,
+          source: 'JOBBUFFER',
+          externalUrl: null,
+          applyUrl: `/api/jobs/${j.id}/apply`
+        };
+      });
     }
 
     // B. Fetch live external Jobvetta jobs unless client explicitly wants only internal
@@ -82,8 +91,8 @@ router.get('/', async (req, res) => {
         const jvResult = await jobvettaService.searchJobs({
           q: queryText,
           location: locationText,
-          days: Number(days) || 14,
-          limit: Number(limit) || 20,
+          days: Number(days) || 30,
+          limit: Number(limit) || 250,
           forceRefresh
         });
         externalJobs = jvResult.jobs;
@@ -125,14 +134,14 @@ router.get('/', async (req, res) => {
  */
 router.get('/jobvetta', async (req, res) => {
   try {
-    const { q, location, days = 14, limit = 20, refresh } = req.query;
+    const { q, location, days = 30, limit = 250, refresh } = req.query;
     const forceRefresh = refresh === 'true' || refresh === '1';
 
     const result = await jobvettaService.searchJobs({
       q: q as string,
       location: location as string,
-      days: Number(days) || 14,
-      limit: Number(limit) || 20,
+      days: Number(days) || 30,
+      limit: Number(limit) || 250,
       forceRefresh
     });
 
@@ -479,6 +488,35 @@ router.post('/:id/apply', async (req, res) => {
         alreadyApplied: true,
         message: 'You have already applied for this opening. The recruiter has your application.',
         application: existingApplication
+      });
+    }
+
+    // ----------------------------------------------------
+    // DAILY APPLICATION LIMIT CHECK (50 Free / 100 Pro)
+    // ----------------------------------------------------
+    const isPro = isCandidatePro(user.email) || isCandidatePro(user.id);
+    const dailyLimit = isPro ? 100 : 50;
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const todayApplicationsCount = await prisma.application.count({
+      where: {
+        candidateId: candidateProfile.id,
+        createdAt: { gte: startOfToday }
+      }
+    });
+
+    if (todayApplicationsCount >= dailyLimit) {
+      return res.status(429).json({
+        success: false,
+        error: 'DAILY_LIMIT_REACHED',
+        limit: dailyLimit,
+        count: todayApplicationsCount,
+        isPro,
+        message: isPro
+          ? `Daily quota reached! You have submitted ${todayApplicationsCount} of ${dailyLimit} applications allowed today on JoBuffer Pro. Quota will reset tomorrow at midnight.`
+          : `Daily limit reached! Free accounts can apply for up to 50 jobs per day (${todayApplicationsCount}/${dailyLimit} applied today). Upgrade to JoBuffer Pro to unlock 100 applications/day!`
       });
     }
 

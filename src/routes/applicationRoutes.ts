@@ -4,7 +4,8 @@ import multer from 'multer';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import fs from 'fs';
-import { jobvettaService } from '../services/jobvettaService';
+import { jobvettaService, getCompanyLogo } from '../services/jobvettaService';
+import { isCandidatePro } from '../utils/candidateProfileStore';
 
 const router = Router();
 
@@ -67,7 +68,7 @@ router.get('/my', async (req, res) => {
         jobId: app.jobId,
         title: app.job?.title || 'Position',
         company: app.job?.company?.name || 'Company',
-        logo: app.job?.company?.logo || 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?w=100&h=100&fit=crop',
+        logo: getCompanyLogo(app.job?.company?.name, app.job?.company?.logo),
         location: app.job?.location || 'Chennai, India',
         salary: app.job?.salaryMin ? `₹${app.job.salaryMin.toLocaleString()}` : 'Competitive',
         status: app.status || 'APPLIED',
@@ -254,7 +255,7 @@ router.get('/', async (req, res) => {
         jobId: app.jobId,
         title: app.job?.title || 'Position',
         company: app.job?.company?.name || 'Company',
-        logo: app.job?.company?.logo || 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?w=100&h=100&fit=crop',
+        logo: getCompanyLogo(app.job?.company?.name, app.job?.company?.logo),
         location: app.job?.location || 'Chennai, India',
         salary: app.job?.salaryMin ? `₹${app.job.salaryMin.toLocaleString()}` : 'Negotiable',
         status: app.status || 'APPLIED',
@@ -377,7 +378,7 @@ router.get('/:id', async (req, res) => {
         jobId: application.jobId,
         title: application.job?.title || 'Position',
         company: application.job?.company?.name || 'Company',
-        logo: application.job?.company?.logo || 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?w=100&h=100&fit=crop',
+        logo: getCompanyLogo(application.job?.company?.name, application.job?.company?.logo),
         location: application.job?.location || 'Chennai',
         jobType: application.job?.jobType || 'Full-time',
         status: currentStatus,
@@ -697,6 +698,35 @@ router.post('/', upload.any(), async (req, res) => {
         alreadyApplied: true,
         message: 'You have already applied for this opening. The recruiter has your application.',
         application: existingApp
+      });
+    }
+
+    // ----------------------------------------------------
+    // DAILY APPLICATION LIMIT CHECK (50 Free / 100 Pro)
+    // ----------------------------------------------------
+    const isPro = isCandidatePro(user.email) || isCandidatePro(user.id);
+    const dailyLimit = isPro ? 100 : 50;
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const todayApplicationsCount = await prisma.application.count({
+      where: {
+        candidateId: candidateProfile.id,
+        createdAt: { gte: startOfToday }
+      }
+    });
+
+    if (todayApplicationsCount >= dailyLimit) {
+      return res.status(429).json({
+        success: false,
+        error: 'DAILY_LIMIT_REACHED',
+        limit: dailyLimit,
+        count: todayApplicationsCount,
+        isPro,
+        message: isPro
+          ? `Daily quota reached! You have submitted ${todayApplicationsCount} of ${dailyLimit} applications allowed today on JoBuffer Pro. Quota will reset tomorrow at midnight.`
+          : `Daily limit reached! Free accounts can apply for up to 50 jobs per day (${todayApplicationsCount}/${dailyLimit} applied today). Upgrade to JoBuffer Pro to unlock 100 applications/day!`
       });
     }
 

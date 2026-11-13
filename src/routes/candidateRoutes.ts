@@ -25,10 +25,21 @@ const saveAlerts = (alerts: any[]) => {
 };
 
 import multer from 'multer';
-import { getCandidateExtendedDetails } from '../utils/candidateProfileStore';
+import { getCandidateExtendedDetails, isCandidatePro, setCandidatePro } from '../utils/candidateProfileStore';
 import { getParsedResumeForCandidate, parseResumeText, extractTextFromResumeBuffer } from '../utils/resumeParser';
+import { getCandidatePricingConfig } from '../services/subscriptionConfigService';
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Public: GET /api/v1/candidates/pricing & /api/candidates/pricing
+router.get('/pricing', (req: Request, res: Response) => {
+  try {
+    const config = getCandidatePricingConfig();
+    return res.status(200).json(config);
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Error retrieving candidate pricing' });
+  }
+});
 
 // 1. GET /api/v1/candidates/profile - Fetch candidate profile with skills and resume
 router.get('/profile', async (req: Request, res: Response) => {
@@ -102,27 +113,34 @@ router.get('/profile', async (req: Request, res: Response) => {
 
     const extDetails = getCandidateExtendedDetails(user, skillNames, candidateProfile.noticePeriod);
 
-    // Prefer real extracted resume data over any static defaults
-    const effectiveSkills = (parsedResume?.skills && parsedResume.skills.length > 0)
+    // ONLY show extracted data if a real resume exists and was parsed! No mock data for fresh accounts!
+    const effectiveSkills = (hasResume && parsedResume?.skills && parsedResume.skills.length > 0)
       ? parsedResume.skills
       : (skillNames.length > 0 ? skillNames : []);
 
-    const effectiveExperience = parsedResume?.experience
-      || (extDetails.experienceList?.[0] ? `${extDetails.experienceList[0].role} (${extDetails.experienceList[0].duration})` : ((candidateProfile as any).experience || ''));
+    const effectiveExperience = (hasResume && parsedResume?.experience)
+      ? parsedResume.experience
+      : ((candidateProfile as any).experience || '');
 
-    const effectiveEducation = (parsedResume?.education && parsedResume.education.length > 0)
+    const effectiveEducation = (hasResume && parsedResume?.education && parsedResume.education.length > 0)
       ? parsedResume.education
-      : (extDetails.education || []);
+      : (hasResume && extDetails.education ? extDetails.education : []);
 
-    const effectiveExperienceList = (parsedResume?.experienceList && parsedResume.experienceList.length > 0)
+    const effectiveExperienceList = (hasResume && parsedResume?.experienceList && parsedResume.experienceList.length > 0)
       ? parsedResume.experienceList
-      : (extDetails.experienceList || []);
+      : (hasResume && extDetails.experienceList ? extDetails.experienceList : []);
 
-    const effectiveHeadline = parsedResume?.headline || extDetails.headline || (effectiveSkills.length > 0 ? `${effectiveSkills[0]} Full Stack Developer` : '');
-    const effectiveBio = parsedResume?.bio || extDetails.bio || '';
-    const effectiveProjects = (parsedResume?.projects && parsedResume.projects.length > 0)
+    const effectiveHeadline = (hasResume && parsedResume?.headline)
+      ? parsedResume.headline
+      : ((user as any).headline || extDetails.headline || (effectiveSkills.length > 0 ? `${effectiveSkills[0]} Specialist` : ''));
+
+    const effectiveBio = (hasResume && parsedResume?.bio)
+      ? parsedResume.bio
+      : ((user as any).bio || extDetails.bio || '');
+
+    const effectiveProjects = (hasResume && parsedResume?.projects && parsedResume.projects.length > 0)
       ? parsedResume.projects
-      : (extDetails.projects || []);
+      : (hasResume && extDetails.projects ? extDetails.projects : []);
 
     let strength = 20;
     if (user.name) strength += 15;
@@ -130,6 +148,10 @@ router.get('/profile', async (req: Request, res: Response) => {
     if (candidateProfile.location) strength += 15;
     if (effectiveSkills.length > 0) strength += 15;
     if (hasResume) strength += 20;
+
+    const isPro = isCandidatePro(user.email) || isCandidatePro(user.id);
+    const subscriptionPlan = extDetails.subscriptionPlan || (isPro ? 'PRO_MONTHLY' : 'FREE');
+    const proExpiresAt = extDetails.proExpiresAt;
 
     const profileData = {
       id: user.id,
@@ -153,7 +175,10 @@ router.get('/profile', async (req: Request, res: Response) => {
       headline: effectiveHeadline,
       resume: primaryResume?.fileUrl || null,
       resumeName: cleanResumeName,
-      profileCompletion: strength
+      profileCompletion: strength,
+      isPro,
+      subscriptionPlan,
+      proExpiresAt
     };
 
     return res.status(200).json({
@@ -165,7 +190,10 @@ router.get('/profile', async (req: Request, res: Response) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
-        profileCompletion: strength
+        profileCompletion: strength,
+        isPro,
+        subscriptionPlan,
+        proExpiresAt
       },
       profile: candidateProfile
     });
@@ -190,7 +218,9 @@ router.put('/profile', upload.any(), async (req: Request, res: Response) => {
       skills,
       noticePeriod,
       expectedSalary,
-      workMode
+      workMode,
+      isPro,
+      subscriptionPlan
     } = req.body;
 
     let user = null;
@@ -325,7 +355,15 @@ router.put('/profile', upload.any(), async (req: Request, res: Response) => {
       }
     }
 
+    if (isPro !== undefined) {
+      const proBool = isPro === true || isPro === 'true';
+      setCandidatePro(user.email, proBool, subscriptionPlan || 'PRO_MONTHLY');
+      setCandidatePro(user.id, proBool, subscriptionPlan || 'PRO_MONTHLY');
+    }
+
     const latestResume = createdResume || candidateProfile.resumes?.[0] || null;
+    const finalIsPro = isCandidatePro(user.email) || isCandidatePro(user.id);
+
     return res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
@@ -344,12 +382,54 @@ router.put('/profile', upload.any(), async (req: Request, res: Response) => {
         headline: parsedResumeData?.headline,
         bio: parsedResumeData?.bio,
         resume: latestResume?.fileUrl || null,
-        resumeName: latestResume?.fileName ? decodeURIComponent(latestResume.fileName) : null
+        resumeName: latestResume?.fileName ? decodeURIComponent(latestResume.fileName) : null,
+        isPro: finalIsPro,
+        subscriptionPlan: finalIsPro ? (subscriptionPlan || 'PRO_MONTHLY') : 'FREE'
       }
     });
   } catch (error) {
     console.error('Update profile error:', error);
     return res.status(500).json({ message: 'Error updating profile' });
+  }
+});
+
+// POST /api/v1/candidates/activate-pro - Activate JoBuffer Pro (1 Month, 3 Months, 6 Months)
+router.post('/activate-pro', async (req: Request, res: Response) => {
+  try {
+    const { userId, email, plan = 'PRO_1_MONTH', durationDays } = req.body;
+    let calculatedDurationDays = Number(durationDays);
+    if (!calculatedDurationDays || isNaN(calculatedDurationDays)) {
+      if (plan === 'PRO_6_MONTH' || plan === '6_MONTH' || plan === 'PRO_ANNUAL') {
+        calculatedDurationDays = 180;
+      } else if (plan === 'PRO_3_MONTH' || plan === '3_MONTH') {
+        calculatedDurationDays = 90;
+      } else {
+        calculatedDurationDays = 30;
+      }
+    }
+
+    let user = null;
+    if (userId) user = await prisma.user.findUnique({ where: { id: String(userId) } });
+    if (!user && email) user = await prisma.user.findUnique({ where: { email: String(email).toLowerCase().trim() } });
+    if (!user) {
+      user = await prisma.user.findFirst({ where: { role: 'CANDIDATE' } });
+    }
+    if (user) {
+      setCandidatePro(user.email, true, plan, calculatedDurationDays);
+      setCandidatePro(user.id, true, plan, calculatedDurationDays);
+    }
+    return res.status(200).json({
+      success: true,
+      message: `JoBuffer Pro (${calculatedDurationDays} days) activated successfully! All AI features & 100 applications/day unlocked.`,
+      data: {
+        isPro: true,
+        subscriptionPlan: plan,
+        durationDays: calculatedDurationDays,
+        proExpiresAt: new Date(Date.now() + calculatedDurationDays * 86400000).toISOString()
+      }
+    });
+  } catch (e) {
+    return res.status(500).json({ message: 'Error activating Pro' });
   }
 });
 

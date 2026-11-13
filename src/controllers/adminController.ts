@@ -12,6 +12,13 @@ import { calculateAtsScore } from '../utils/atsCalculator';
 import { resolveCandidateName } from '../utils/candidateNameHelper';
 import { permanentlyDeleteUser } from '../services/userDeletionService';
 import { getCandidateExtendedDetails } from '../utils/candidateProfileStore';
+import {
+  getSubscriptionConfig,
+  saveSubscriptionConfig,
+  getSubscriptionPayments,
+  getRecruiterPricingPlans,
+  getCandidatePricingConfig
+} from '../services/subscriptionConfigService';
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
@@ -1173,6 +1180,145 @@ export const deleteApplication = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error deleting application:', error);
     return res.status(500).json({ message: 'Error deleting application', error: error?.message });
+  }
+};
+
+export const getAdminSubscriptionConfig = async (req: Request, res: Response) => {
+  try {
+    const config = getSubscriptionConfig();
+    const recruiterPlans = getRecruiterPricingPlans(config);
+    const candidatePlans = getCandidatePricingConfig();
+
+    const proCount = await prisma.recruiterProfile.count({
+      where: { plan: 'PRO' }
+    });
+    const freeCount = await prisma.recruiterProfile.count({
+      where: { plan: 'FREE' }
+    });
+    const payments = getSubscriptionPayments();
+    const totalRevenue = payments
+      .filter(p => p.status === 'COMPLETED')
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    return res.status(200).json({
+      config,
+      recruiterPlans,
+      candidatePlans,
+      stats: {
+        proRecruiters: proCount,
+        freeRecruiters: freeCount,
+        totalRevenue,
+        totalTransactions: payments.length
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching admin subscription config:', error);
+    return res.status(500).json({ message: 'Error retrieving subscription configuration' });
+  }
+};
+
+export const updateAdminSubscriptionConfig = async (req: Request, res: Response) => {
+  try {
+    const {
+      proPrice,
+      proOriginalPrice,
+      currency,
+      upiId,
+      accountName,
+      monthlyJobLimit,
+      candidateProfileLimit,
+      atsFeatureEnabled,
+      featuresList,
+      // Recruiter 1, 3, 6 month tiers
+      recruiter1MonthPrice,
+      recruiter1MonthOriginalPrice,
+      recruiter3MonthPrice,
+      recruiter3MonthOriginalPrice,
+      recruiter6MonthPrice,
+      recruiter6MonthOriginalPrice,
+      // Candidate 1, 3, 6 month tiers
+      candidate1MonthPrice,
+      candidate1MonthOriginalPrice,
+      candidate3MonthPrice,
+      candidate3MonthOriginalPrice,
+      candidate6MonthPrice,
+      candidate6MonthOriginalPrice,
+      // Legacy fields
+      candidateMonthlyPrice,
+      candidateAnnualPrice,
+      candidateMonthlyOriginalPrice,
+      candidateAnnualOriginalPrice,
+      candidateDailyApplyLimitFree,
+      candidateDailyApplyLimitPro
+    } = req.body;
+
+    // Validate numbers if provided
+    const validatePositive = (val: any, label: string) => {
+      if (val !== undefined && (isNaN(Number(val)) || Number(val) < 0)) {
+        throw new Error(`Invalid ${label} amount`);
+      }
+    };
+
+    try {
+      validatePositive(proPrice, 'Recruiter PRO');
+      validatePositive(recruiter1MonthPrice, 'Recruiter 1-Month');
+      validatePositive(recruiter3MonthPrice, 'Recruiter 3-Month');
+      validatePositive(recruiter6MonthPrice, 'Recruiter 6-Month');
+      validatePositive(candidate1MonthPrice, 'Candidate 1-Month');
+      validatePositive(candidate3MonthPrice, 'Candidate 3-Month');
+      validatePositive(candidate6MonthPrice, 'Candidate 6-Month');
+      validatePositive(candidateMonthlyPrice, 'Candidate Monthly');
+    } catch (validationErr: any) {
+      return res.status(400).json({ message: validationErr.message });
+    }
+
+    const updated = saveSubscriptionConfig({
+      // Recruiter 1, 3, 6 Months
+      recruiter1MonthPrice: recruiter1MonthPrice !== undefined ? Number(recruiter1MonthPrice) : (proPrice !== undefined ? Number(proPrice) : undefined),
+      recruiter1MonthOriginalPrice: recruiter1MonthOriginalPrice !== undefined ? Number(recruiter1MonthOriginalPrice) : (proOriginalPrice !== undefined ? Number(proOriginalPrice) : undefined),
+      recruiter3MonthPrice: recruiter3MonthPrice !== undefined ? Number(recruiter3MonthPrice) : undefined,
+      recruiter3MonthOriginalPrice: recruiter3MonthOriginalPrice !== undefined ? Number(recruiter3MonthOriginalPrice) : undefined,
+      recruiter6MonthPrice: recruiter6MonthPrice !== undefined ? Number(recruiter6MonthPrice) : undefined,
+      recruiter6MonthOriginalPrice: recruiter6MonthOriginalPrice !== undefined ? Number(recruiter6MonthOriginalPrice) : undefined,
+
+      // Candidate 1, 3, 6 Months
+      candidate1MonthPrice: candidate1MonthPrice !== undefined ? Number(candidate1MonthPrice) : (candidateMonthlyPrice !== undefined ? Number(candidateMonthlyPrice) : undefined),
+      candidate1MonthOriginalPrice: candidate1MonthOriginalPrice !== undefined ? Number(candidate1MonthOriginalPrice) : (candidateMonthlyOriginalPrice !== undefined ? Number(candidateMonthlyOriginalPrice) : undefined),
+      candidate3MonthPrice: candidate3MonthPrice !== undefined ? Number(candidate3MonthPrice) : undefined,
+      candidate3MonthOriginalPrice: candidate3MonthOriginalPrice !== undefined ? Number(candidate3MonthOriginalPrice) : undefined,
+      candidate6MonthPrice: candidate6MonthPrice !== undefined ? Number(candidate6MonthPrice) : (candidateAnnualPrice !== undefined ? Number(candidateAnnualPrice) : undefined),
+      candidate6MonthOriginalPrice: candidate6MonthOriginalPrice !== undefined ? Number(candidate6MonthOriginalPrice) : (candidateAnnualOriginalPrice !== undefined ? Number(candidateAnnualOriginalPrice) : undefined),
+
+      currency: currency || 'INR',
+      upiId: upiId !== undefined ? String(upiId).trim() : undefined,
+      accountName: accountName !== undefined ? String(accountName).trim() : undefined,
+      monthlyJobLimit: monthlyJobLimit !== undefined ? Number(monthlyJobLimit) : undefined,
+      candidateProfileLimit: candidateProfileLimit !== undefined ? Number(candidateProfileLimit) : undefined,
+      atsFeatureEnabled: atsFeatureEnabled !== undefined ? Boolean(atsFeatureEnabled) : undefined,
+      featuresList: Array.isArray(featuresList) ? featuresList : undefined,
+      candidateDailyApplyLimitFree: candidateDailyApplyLimitFree !== undefined ? Number(candidateDailyApplyLimitFree) : undefined,
+      candidateDailyApplyLimitPro: candidateDailyApplyLimitPro !== undefined ? Number(candidateDailyApplyLimitPro) : undefined
+    }, (req as any).user?.name || 'Admin');
+
+    console.log(`[ADMIN] Subscription configuration updated by ${(req as any).user?.name || 'Admin'}: Recruiter [1m: ₹${updated.recruiter1MonthPrice}, 3m: ₹${updated.recruiter3MonthPrice}, 6m: ₹${updated.recruiter6MonthPrice}], Candidate [1m: ₹${updated.candidate1MonthPrice}, 3m: ₹${updated.candidate3MonthPrice}, 6m: ₹${updated.candidate6MonthPrice}]`);
+
+    return res.status(200).json({
+      message: 'Subscription pricing and application settings updated successfully!',
+      config: updated
+    });
+  } catch (error) {
+    console.error('Error updating admin subscription config:', error);
+    return res.status(500).json({ message: 'Error updating subscription configuration' });
+  }
+};
+
+export const getAdminSubscriptionPayments = async (req: Request, res: Response) => {
+  try {
+    const payments = getSubscriptionPayments();
+    return res.status(200).json(payments);
+  } catch (error) {
+    console.error('Error fetching subscription payments:', error);
+    return res.status(500).json({ message: 'Error retrieving payments' });
   }
 };
 

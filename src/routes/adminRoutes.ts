@@ -34,7 +34,10 @@ import {
   getEmailDeliveryLogs,
   deleteEmailDeliveryLog,
   dispatchEmailAnnouncement,
-  remindInterview
+  remindInterview,
+  getAdminSubscriptionConfig,
+  updateAdminSubscriptionConfig,
+  getAdminSubscriptionPayments
 } from '../controllers/adminController';
 import { authenticate, authorize } from '../middleware/auth';
 
@@ -80,6 +83,11 @@ router.get('/reports', getReports);
 router.get('/categories', getCategories);
 router.post('/categories', createCategory);
 router.get('/skills', getSkills);
+
+// Recruiter PRO Plan Pricing & Monetization Config
+router.get('/subscription-config', getAdminSubscriptionConfig);
+router.put('/subscription-config', updateAdminSubscriptionConfig);
+router.get('/subscription-payments', getAdminSubscriptionPayments);
 
 export default router;
 

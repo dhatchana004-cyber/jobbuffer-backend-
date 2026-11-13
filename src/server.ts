@@ -11,13 +11,17 @@ const PORT = process.env.PORT || 5000;
 
 async function bootstrap() {
   try {
-    // Test DB Connection
-    await prisma.$connect();
-    console.log('✅ Database connected successfully');
-
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
+
+    // Test DB Connection
+    try {
+      await prisma.$connect();
+      console.log('✅ Database connected successfully');
+    } catch (dbError) {
+      console.error('⚠️ Database connection warning:', dbError);
+    }
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);
