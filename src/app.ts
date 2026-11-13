@@ -53,11 +53,6 @@ app.use(cors({
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'Cache-Control', 'Pragma', 'X-Access-Token']
 }));
 
-// Preflight handler for all routes
-app.options('*', (req: Request, res: Response) => {
-  res.status(200).end();
-});
-
 // Security Middleware - allow cross-origin resource access for PDF previews & downloads
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
