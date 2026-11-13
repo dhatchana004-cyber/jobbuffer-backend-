@@ -11,8 +11,12 @@ const PORT = process.env.PORT || 5000;
 
 async function bootstrap() {
   try {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
+    });
+
+    server.on('error', (err: any) => {
+      console.error(`❌ Server listen error on port ${PORT}:`, err);
     });
 
     // Test DB Connection
