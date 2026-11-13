@@ -10,5 +10,8 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
+  "ts-node": {
+    "transpileOnly": true
+  },
   "include": ["src/**/*"]
 }
