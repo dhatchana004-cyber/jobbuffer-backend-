@@ -7,7 +7,7 @@ import { PrismaClient } from '@prisma/client';
 
 export const prisma = new PrismaClient();
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5008;
 
 async function bootstrap() {
   try {
