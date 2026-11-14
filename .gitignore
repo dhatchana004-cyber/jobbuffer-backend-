@@ -9,4 +9,5 @@ uploads/*
 .payment-history.json
 .payment-orders.json
 .subscription-payments.json
+.jobvetta-cache.json
 
