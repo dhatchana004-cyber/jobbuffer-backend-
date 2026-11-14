@@ -401,124 +401,38 @@ export const login = async (req: Request, res: Response) => {
       }
     });
     if (!user) {
-      // Check if user was previously deleted by admin or if entering afresh
-      const deletedInfo = getDeletedUserInfo(normalizedEmail);
-
-      // Determine role on creation: ADMIN for admin emails, RECRUITER if specified or deleted as recruiter, else CANDIDATE
-      const roleToCreate: 'ADMIN' | 'RECRUITER' | 'CANDIDATE' = isAdminEmail 
-        ? 'ADMIN' 
-        : (isRecruiterIntent || deletedInfo?.role === 'RECRUITER' ? 'RECRUITER' : 'CANDIDATE');
-
-      const rawName = deletedInfo?.name || normalizedEmail.split('@')[0] || (isAdminEmail ? 'System Admin' : 'User');
-      const formattedName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
-      const passwordHash = await bcrypt.hash(password || (isAdminEmail ? '123456' : 'password123'), 10);
-
-      const newUser = await prisma.user.create({
-        data: {
-          name: formattedName,
-          email: normalizedEmail,
-          passwordHash,
-          role: roleToCreate,
-          emailVerified: true,
-          status: 'ACTIVE',
-          lastLoginAt: new Date()
-        }
-      });
-
-      if (roleToCreate === 'CANDIDATE') {
-        await prisma.candidateProfile.create({
-          data: {
-            userId: newUser.id
-          }
-        });
-      } else if (roleToCreate === 'RECRUITER') {
-        const company = await prisma.company.create({
-          data: {
-            name: `${formattedName}'s Enterprise`,
-            industry: 'Technology',
-            size: '1-10 employees'
-          }
-        });
-        await prisma.recruiterProfile.create({
-          data: {
-            userId: newUser.id,
-            companyId: company.id,
-            designation: 'Hiring Manager'
-          }
-        });
-      }
-
-      // Clean up from deleted store now that new user is active
-      removeDeletedUserInfo(normalizedEmail);
-
-      const token = jwt.sign(
-        { id: newUser.id, email: newUser.email, role: newUser.role },
-        JWT_SECRET,
-        { expiresIn: '1h' }
-      );
-
-      const refreshToken = jwt.sign(
-        { id: newUser.id },
-        JWT_REFRESH_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      console.log(`[AUTH] Fresh new user created on login: ${normalizedEmail} (${roleToCreate})`);
-
-      return res.status(200).json({
-        message: 'Welcome! Your account has been initialized.',
-        isNewUser: true,
-        token,
-        refreshToken,
-        user: {
-          id: newUser.id,
-          name: newUser.name,
-          email: newUser.email,
-          phone: '',
-          role: newUser.role,
-          profileImage: null,
-          location: 'Chennai, India',
-          workPreference: 'Hybrid / Remote',
-          noticePeriod: '15 Days',
-          expectedSalary: '₹8,50,000 - ₹14,00,000 PA',
-          skills: [],
-          resume: null,
-          resumeName: null,
-          profileCompletion: 20
-        }
-      });
+      return res.status(401).json({ message: 'Invalid email or password. Please check your credentials.' });
     }
 
-    // Verify Password with fallback support for Admin & Recruiters
+    // Verify Password strictly against user's actual credentials
     const cleanPassword = (password || '').trim();
-    let isMatch = await bcrypt.compare(cleanPassword, user.passwordHash);
+    if (!cleanPassword) {
+      return res.status(400).json({ message: 'Password is required' });
+    }
 
-    // Direct displayPassword match
+    let isMatch = false;
+    if (user.passwordHash) {
+      try {
+        isMatch = await bcrypt.compare(cleanPassword, user.passwordHash);
+      } catch (err) {
+        console.error('[AUTH] bcrypt.compare error:', err);
+      }
+    }
+
+    // Secondary verification: direct match against user.displayPassword if present
     if (!isMatch && user.displayPassword && cleanPassword === user.displayPassword) {
       isMatch = true;
-    }
-
-    if (!isMatch && isAdminEmail && (cleanPassword === '123456' || cleanPassword === 'admin123' || cleanPassword === 'admin' || cleanPassword === 'password123')) {
-      // Self-heal admin password
-      const newHash = await bcrypt.hash(cleanPassword, 10);
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { passwordHash: newHash, displayPassword: cleanPassword, role: 'ADMIN' }
-      });
-      isMatch = true;
-    } else if (!isMatch && (user.role === 'RECRUITER' || user.recruiterProfile || normalizedEmail.includes('harish') || normalizedEmail.includes('haish') || normalizedEmail.includes('tamil')) && 
-      (cleanPassword === 'harish@123' || cleanPassword === 'Harish@123' || cleanPassword === '123456' || cleanPassword === 'password123')) {
-      // Self-heal recruiter password
-      const newHash = await bcrypt.hash(cleanPassword, 10);
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { passwordHash: newHash, displayPassword: cleanPassword }
-      });
-      isMatch = true;
+      try {
+        const newHash = await bcrypt.hash(cleanPassword, 10);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { passwordHash: newHash }
+        });
+      } catch {}
     }
 
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Invalid email or password. Please check your credentials.' });
     }
 
     if (user.status !== 'ACTIVE') {
@@ -819,6 +733,7 @@ export const resetPassword = async (req: Request, res: Response) => {
       where: { id: user.id },
       data: {
         passwordHash,
+        displayPassword: newPassword,
         updatedAt: new Date()
       }
     });
