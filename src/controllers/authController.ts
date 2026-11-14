@@ -380,12 +380,26 @@ export const resendOtp = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password, role: requestedRole } = req.body;
-    const normalizedEmail = (email || '').toLowerCase().trim();
-    const isAdminEmail = normalizedEmail === 'admin@mail.com' || normalizedEmail.startsWith('admin@');
+    const rawInput = (email || '').trim();
+    const normalizedInput = rawInput.toLowerCase();
+    
+    // Resolve known aliases: "admin" -> "admin@mail.com"
+    let searchEmail = normalizedInput;
+    if (normalizedInput === 'admin') {
+      searchEmail = 'admin@mail.com';
+    }
+
+    const isAdminEmail = searchEmail === 'admin@mail.com' || searchEmail.startsWith('admin@');
     const isRecruiterIntent = requestedRole === 'RECRUITER';
 
-    let user = await prisma.user.findUnique({ 
-      where: { email: normalizedEmail },
+    let user = await prisma.user.findFirst({ 
+      where: { 
+        OR: [
+          { email: searchEmail },
+          { email: normalizedInput },
+          { name: { equals: rawInput, mode: 'insensitive' } }
+        ]
+      },
       include: {
         candidateProfile: {
           include: {
@@ -401,7 +415,7 @@ export const login = async (req: Request, res: Response) => {
       }
     });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password. Please check your credentials.' });
+      return res.status(401).json({ message: 'Invalid email/username or password. Please check your credentials.' });
     }
 
     // Verify Password strictly against user's actual credentials
@@ -432,7 +446,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid email or password. Please check your credentials.' });
+      return res.status(401).json({ message: 'Invalid email/username or password. Please check your credentials.' });
     }
 
     if (user.status !== 'ACTIVE') {
