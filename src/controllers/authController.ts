@@ -388,6 +388,7 @@ export const login = async (req: Request, res: Response) => {
     if (normalizedInput === 'admin') {
       searchEmail = 'admin@mail.com';
     }
+    const normalizedEmail = searchEmail;
 
     const isAdminEmail = searchEmail === 'admin@mail.com' || searchEmail.startsWith('admin@');
     const isRecruiterIntent = requestedRole === 'RECRUITER';
